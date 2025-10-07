@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environment
+venv/
+ENV/
+.env/
+.venv/
+
+# PyQt5 UI compiler output
+*.ui.py
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Log files
+*.log
+
+# Output images (optional, ถ้าไม่อยาก track ภาพที่ถ่าย)
+Photobooth-master/output_images/
+
+# VSCode/IDE
+.vscode/
+.idea/
+
+# Ignore backgrounds/photos ที่เป็นภาพตัวอย่าง (ถ้าไม่อยาก track)
+# Photobooth-master/backgrounds/photos/*.png
+# Photobooth-master/backgrounds/photos/*.jpg
