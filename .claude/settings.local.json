@@ -8,7 +8,8 @@
       "Bash(venv/Scripts/python.exe -m pip uninstall:*)",
       "Bash(venv/Scripts/python.exe -m pip install:*)",
       "Bash(venv/Scripts/python.exe:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []

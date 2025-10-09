@@ -32,23 +32,45 @@ BUTTON_SIZE = (160, 110)
 PROJECT_ROOT = Path(__file__).resolve().parent
 BG_ROOT = PROJECT_ROOT / "backgrounds" / "photos"
 
-DARK_QSS = """
-* { color: #eaeaea; font-family: "Inter", "Segoe UI", system-ui; }
-QWidget { background-color: #111; }
-QLabel[hero="true"] { font-size: 24px; font-weight: 700; color: #fff; }
-QLabel[section="true"] { font-size: 18px; font-weight: 600; color: #ddd; }
+ORANGE_WHITE_QSS = """
+* { color: #333; font-family: "Segoe UI", "Arial", system-ui; }
+QWidget { background-color: #ffffff; }
+QLabel[hero="true"] {
+    font-size: 32px; font-weight: 700; color: #ff8c00;
+    padding: 10px; background-color: #fff5e6; border-radius: 8px;
+}
+QLabel[section="true"] {
+    font-size: 18px; font-weight: 600; color: #ff8c00;
+    padding: 8px; background-color: #fff; border-bottom: 2px solid #ff8c00;
+}
 QPushButton {
-    background-color: #1f1f1f; border: 2px solid #2d2d2d; border-radius: 12px;
-    padding: 12px; font-weight: 600;
+    background-color: #ffffff; border: 2px solid #ff8c00; border-radius: 12px;
+    padding: 12px; font-weight: 600; color: #ff8c00;
 }
-QPushButton:hover { background-color: #2a2a2a; border: 2px solid #3a3a3a; }
-QPushButton:pressed { background-color: #161616; }
-QSlider::groove:horizontal { height: 6px; background: #2b2b2b; border-radius: 3px; }
+QPushButton:hover {
+    background-color: #fff5e6; border: 2px solid #ff6600;
+}
+QPushButton:pressed {
+    background-color: #ffe6cc; border: 2px solid #ff8c00;
+}
+QPushButton:checked {
+    background-color: #ff8c00; color: white; border: 2px solid #ff8c00;
+}
+QPushButton:checked:hover {
+    background-color: #ff6600; border: 2px solid #ff6600;
+}
+QSlider::groove:horizontal {
+    height: 6px; background: #ffe6cc; border-radius: 3px;
+}
 QSlider::handle:horizontal {
-    background: #3f7ae0; width: 16px; border-radius: 8px; margin: -6px 0;
+    background: #ff8c00; width: 16px; border-radius: 8px; margin: -6px 0;
 }
-QScrollArea { border: none; }
-QFrame#line { background-color: #2a2a2a; max-height: 2px; min-height: 2px; }
+QScrollArea {
+    border: none; background-color: #ffffff;
+}
+QFrame#line {
+    background-color: #ffe6cc; max-height: 2px; min-height: 2px;
+}
 """
 
 # ---------------- Props/MediaPipe Functions ----------------
@@ -109,7 +131,7 @@ def load_prop(path):
     return im
 
 
-def create_photobooth_frame(images: list, frame_config_name="default"):
+def create_photobooth_frame(images: list, frame_config_name="fibooth_modern"):
     """Create photobooth strip with 3 images using custom frame template"""
     import json
 
@@ -172,30 +194,12 @@ def create_photobooth_frame(images: list, frame_config_name="default"):
             target_width = pos["width"]
             target_height = pos["height"]
 
-            # Get original image dimensions
-            img_h, img_w = img.shape[:2]
-            img_aspect = img_w / img_h
-            target_aspect = target_width / target_height
-
-            # Resize keeping aspect ratio (fit inside target area)
-            if img_aspect > target_aspect:
-                # Image is wider - fit to width
-                new_width = target_width
-                new_height = int(target_width / img_aspect)
-            else:
-                # Image is taller - fit to height
-                new_height = target_height
-                new_width = int(target_height * img_aspect)
-
-            # Resize image
-            resized = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
-
-            # Center the image in the target area
-            offset_x = (target_width - new_width) // 2
-            offset_y = (target_height - new_height) // 2
+            # Simple approach: resize to exact dimensions directly
+            # This ensures no size mismatch issues
+            final_image = cv2.resize(img, (target_width, target_height), interpolation=cv2.INTER_AREA)
 
             # Place image on canvas
-            canvas[y+offset_y:y+offset_y+new_height, x+offset_x:x+offset_x+new_width] = resized
+            canvas[y:y+target_height, x:x+target_width] = final_image
 
     return canvas
 
@@ -358,7 +362,7 @@ class ProcessorWorker(QThread):
             "glasses": False,
             "mustache": False,
             "hat": False,
-            "logo": False
+            "logo": True  # Logo enabled by default
         }
 
     @pyqtSlot(np.ndarray, dict)
@@ -395,7 +399,6 @@ class ProcessorWorker(QThread):
         outline_thickness_val = settings["outline_thickness_val"]
         outline_color = settings["outline_color"]
         outline_opacity = settings["outline_opacity"]
-        current_filter = settings["current_filter"]
 
         bg = self.bg_manager.get_background()
 
@@ -414,8 +417,8 @@ class ProcessorWorker(QThread):
                 outline_opacity=outline_opacity
             )
 
-        # ฟิลเตอร์
-        frame = self.filter_manager.apply_filter(frame, current_filter)
+        # ฟิลเตอร์ - ใช้แค่แบบปกติ (None)
+        # frame = self.filter_manager.apply_filter(frame, current_filter)
 
         # Apply virtual props (glasses, mustache, hat)
         frame = self._apply_props(frame)
@@ -542,6 +545,7 @@ class PhotoBoothUI(QWidget):
         self.countdown_value = 0
         self.countdown_timer = QTimer()
         self.countdown_timer.timeout.connect(self._countdown_tick)
+        self.current_frame_config = "fibooth_modern"  # Default frame
 
         # Store latest processed frame for capture (full resolution)
         self.latest_processed_frame = None
@@ -552,7 +556,7 @@ class PhotoBoothUI(QWidget):
 
         # UI
         self._init_ui()
-        self.setStyleSheet(DARK_QSS)
+        self.setStyleSheet(ORANGE_WHITE_QSS)
 
         # Connect threads (PyQt5: ใช้ Qt.QueuedConnection)
         self.camera.frame_ready.connect(self._on_camera_frame, Qt.QueuedConnection)
@@ -566,20 +570,32 @@ class PhotoBoothUI(QWidget):
     def _init_ui(self):
         from PyQt5.QtWidgets import QColorDialog
         import os
-        self.setWindowTitle("Photobooth")
+        self.setWindowTitle("FIBOOTH - KMUTT OPENHOUSE 2025")
         self.showMaximized()
 
         # Video preview
         self.video_label = QLabel()
         self.video_label.setAlignment(Qt.AlignCenter)
-        self.video_label.setStyleSheet("background-color: black;")
+        self.video_label.setStyleSheet("""
+            background-color: black;
+            border: 5px solid #ff8c00;
+            border-radius: 15px;
+        """)
         self.video_label.setMinimumSize(640, 360)
 
         # ปุ่มถ่ายภาพ
-        self.capture_btn = QPushButton("📸 ถ่าย 3 รูป")
-        self.capture_btn.setFixedHeight(48)
-        self.capture_btn.setStyleSheet("font-size: 18px; font-weight: bold; background: #3f7ae0; color: white; border-radius: 12px;")
-        self.capture_btn.clicked.connect(self._start_photobooth_sequence)
+        self.capture_btn = QPushButton("📸 ถ่ายภาพ")
+        self.capture_btn.setFixedHeight(60)
+        self.capture_btn.setStyleSheet("""
+            font-size: 20px; font-weight: bold;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #ff8c00, stop:1 #ff6600);
+            color: white;
+            border: none;
+            border-radius: 15px;
+            padding: 10px 20px;
+        """)
+        self.capture_btn.clicked.connect(self._capture_single_photo)
 
         # Countdown overlay label
         self.countdown_label = QLabel("")
@@ -595,7 +611,14 @@ class PhotoBoothUI(QWidget):
 
         # Floating info (FPS)
         self.info_label = QLabel("FPS: --")
-        self.info_label.setStyleSheet("padding:4px; background: rgba(0,0,0,0.7); border-radius: 8px;")
+        self.info_label.setStyleSheet("""
+            padding: 8px 12px;
+            background: rgba(255, 140, 0, 0.9);
+            color: white;
+            border-radius: 8px;
+            font-weight: bold;
+            font-size: 14px;
+        """)
         self.info_label.setAttribute(Qt.WA_TransparentForMouseEvents, True)
 
         # --- Background Section ---
@@ -646,20 +669,6 @@ class PhotoBoothUI(QWidget):
         color_row.addWidget(self.color_btn)
         outline_section.addLayout(color_row)
 
-        # --- Filter Section ---
-        filter_section = QVBoxLayout()
-        filter_title = QLabel("🎨 Filters")
-        filter_title.setProperty("section", True)
-        filter_title.setAlignment(Qt.AlignCenter)
-        filter_section.addWidget(filter_title)
-        filter_row = QHBoxLayout()
-        for fname in self.filter_manager.FILTER_NAMES:
-            btn = QPushButton(fname)
-            btn.setFixedSize(120, 60)
-            btn.clicked.connect(lambda checked=False, f=fname: self._set_filter(f))
-            filter_row.addWidget(btn)
-        filter_section.addLayout(filter_row)
-
         # --- Props Section ---
         props_section = QVBoxLayout()
         props_title = QLabel("🎭 Virtual Props")
@@ -694,26 +703,79 @@ class PhotoBoothUI(QWidget):
         # Logo button
         self.logo_btn = QPushButton("🏢 Logo")
         self.logo_btn.setCheckable(True)
+        self.logo_btn.setChecked(True)  # Default ON
         self.logo_btn.setFixedSize(120, 60)
         self.logo_btn.clicked.connect(self._toggle_logo)
         props_grid.addWidget(self.logo_btn, 1, 1)
 
         props_section.addLayout(props_grid)
 
+        # --- Frame Selection Section ---
+        frame_section = QVBoxLayout()
+        frame_title = QLabel("🖼️ Frame Style")
+        frame_title.setProperty("section", True)
+        frame_title.setAlignment(Qt.AlignCenter)
+        frame_section.addWidget(frame_title)
+
+        # Frame preview
+        self.frame_preview = QLabel()
+        self.frame_preview.setAlignment(Qt.AlignCenter)
+        self.frame_preview.setFixedSize(250, 375)
+        self.frame_preview.setStyleSheet("""
+            border: 3px solid #ff8c00;
+            border-radius: 8px;
+            background-color: #fff;
+        """)
+        self.frame_preview.setScaledContents(False)
+        frame_section.addWidget(self.frame_preview, alignment=Qt.AlignCenter)
+
+        frame_grid = QGridLayout()
+        frame_grid.setSpacing(10)
+
+        # Frame buttons
+        self.frame_modern_btn = QPushButton("Modern")
+        self.frame_modern_btn.setCheckable(True)
+        self.frame_modern_btn.setChecked(True)
+        self.frame_modern_btn.setFixedSize(120, 60)
+        self.frame_modern_btn.clicked.connect(lambda: self._select_frame("fibooth_modern"))
+        frame_grid.addWidget(self.frame_modern_btn, 0, 0)
+
+        self.frame_gradient_btn = QPushButton("Gradient")
+        self.frame_gradient_btn.setCheckable(True)
+        self.frame_gradient_btn.setFixedSize(120, 60)
+        self.frame_gradient_btn.clicked.connect(lambda: self._select_frame("fibooth_gradient"))
+        frame_grid.addWidget(self.frame_gradient_btn, 0, 1)
+
+        self.frame_bold_btn = QPushButton("Bold")
+        self.frame_bold_btn.setCheckable(True)
+        self.frame_bold_btn.setFixedSize(120, 60)
+        self.frame_bold_btn.clicked.connect(lambda: self._select_frame("fibooth_bold"))
+        frame_grid.addWidget(self.frame_bold_btn, 1, 0)
+
+        frame_section.addLayout(frame_grid)
+
+        # Load initial frame preview
+        self._update_frame_preview("fibooth_modern")
+
         # --- Assemble right panel ---
         right_panel = QVBoxLayout()
-        title = QLabel("Photobooth")
+        title = QLabel("FIBOOTH")
         title.setProperty("hero", True)
         title.setAlignment(Qt.AlignCenter)
         right_panel.addWidget(title)
+
+        subtitle = QLabel("KMUTT OPENHOUSE 2025")
+        subtitle.setAlignment(Qt.AlignCenter)
+        subtitle.setStyleSheet("font-size: 14px; color: #ff8c00; font-weight: 600;")
+        right_panel.addWidget(subtitle)
         right_panel.addSpacing(10)
         right_panel.addLayout(bg_section)
         right_panel.addSpacing(16)
         right_panel.addLayout(outline_section)
         right_panel.addSpacing(16)
-        right_panel.addLayout(filter_section)
-        right_panel.addSpacing(16)
         right_panel.addLayout(props_section)
+        right_panel.addSpacing(16)
+        right_panel.addLayout(frame_section)
         right_panel.addStretch()
 
         # --- Main layout ---
@@ -758,7 +820,6 @@ class PhotoBoothUI(QWidget):
             "outline_thickness_val": OutlineManager.THICKNESS["Medium"],  # ใช้ Medium ตลอด
             "outline_color": self.outline_manager.current_color,
             "outline_opacity": 1.0,  # เต็มเสมอ
-            "current_filter": self.filter_manager.current_filter,
         }
         self.processor.enqueue(frame, settings)
 
@@ -820,17 +881,16 @@ class PhotoBoothUI(QWidget):
         self.color_btn.setStyleSheet(f"background-color: rgb({c[2]}, {c[1]}, {c[0]}); min-width: 80px; min-height: 40px;")
         self.color_btn.setText("")
 
-    def _start_photobooth_sequence(self):
-        """Start 3-shot photobooth sequence"""
+    def _capture_single_photo(self):
+        """Capture a single photo with countdown"""
         if self.photobooth_mode:
             return  # Already in progress
 
         self.photobooth_mode = True
-        self.captured_images = []
         self.capture_btn.setEnabled(False)
-        self.capture_btn.setText("⏳ กำลังถ่ายภาพ...")
+        self.capture_btn.setText("⏳ กำลังถ่าย...")
 
-        # Start countdown for first shot
+        # Start countdown
         self.countdown_value = 3
         self.countdown_label.setText(str(self.countdown_value))
         self.countdown_label.show()
@@ -844,26 +904,47 @@ class PhotoBoothUI(QWidget):
             self.countdown_label.setText(str(self.countdown_value))
         elif self.countdown_value == 0:
             # Capture!
-            self.countdown_label.setText("📸")
-            QTimer.singleShot(200, self._capture_one_image)
-        else:
-            # Check if we have all 3 images
-            if len(self.captured_images) < 3:
-                # Start countdown for next shot
-                self.countdown_value = 3
-                self.countdown_label.setText(str(self.countdown_value))
-            else:
-                # All done! Create photobooth strip
-                self.countdown_timer.stop()
-                self.countdown_label.hide()
-                self._create_photobooth_strip()
+            self.countdown_label.setText("📸 SMILE!")
+            QTimer.singleShot(300, self._save_single_image)
+            # Hide countdown after capture
+            QTimer.singleShot(800, self._finish_capture)
 
-    def _capture_one_image(self):
-        """Capture one image from video"""
-        if self.latest_processed_frame is not None:
-            # Use full resolution processed frame
-            self.captured_images.append(self.latest_processed_frame.copy())
-            print(f"[Photobooth] Captured image {len(self.captured_images)}/3 (resolution: {self.latest_processed_frame.shape[1]}x{self.latest_processed_frame.shape[0]})")
+    def _save_single_image(self):
+        """Save single captured image"""
+        from datetime import datetime
+        from PyQt5.QtWidgets import QMessageBox
+
+        if self.latest_processed_frame is None:
+            QMessageBox.warning(self, "ข้อผิดพลาด", "ไม่สามารถถ่ายภาพได้")
+            self._reset_photobooth_mode()
+            return
+
+        # Store the image
+        if not hasattr(self, 'captured_images'):
+            self.captured_images = []
+
+        self.captured_images.append(self.latest_processed_frame.copy())
+        print(f"[Photobooth] Captured image {len(self.captured_images)} (resolution: {self.latest_processed_frame.shape[1]}x{self.latest_processed_frame.shape[0]})")
+
+        # Check if we have 3 images to create strip
+        if len(self.captured_images) >= 3:
+            self._create_photobooth_strip()
+        else:
+            # Save individual image
+            out_dir = Path(__file__).resolve().parent / "output_images"
+            out_dir.mkdir(exist_ok=True)
+            now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
+            out_path = out_dir / f"photo_{now}.png"
+            cv2.imwrite(str(out_path), self.latest_processed_frame)
+
+            print(f"[Photobooth] Saved photo: {out_path}")
+            QMessageBox.information(self, "สำเร็จ! 🎉", f"บันทึกรูปภาพแล้ว:\n{out_path}\n\nรูปที่ {len(self.captured_images)}/3 สำหรับ Photobooth Strip")
+
+    def _finish_capture(self):
+        """Finish capture sequence"""
+        self.countdown_timer.stop()
+        self.countdown_label.hide()
+        self._reset_photobooth_mode()
 
     def _create_photobooth_strip(self):
         """Create final photobooth strip with 3 images"""
@@ -871,12 +952,10 @@ class PhotoBoothUI(QWidget):
         from PyQt5.QtWidgets import QMessageBox
 
         if len(self.captured_images) < 3:
-            QMessageBox.warning(self, "ข้อผิดพลาด", "ไม่สามารถถ่ายภาพครบ 3 รูปได้")
-            self._reset_photobooth_mode()
             return
 
-        # Create photobooth frame
-        strip = create_photobooth_frame(self.captured_images)
+        # Create photobooth frame with selected frame style
+        strip = create_photobooth_frame(self.captured_images[-3:], self.current_frame_config)  # Use last 3 images
 
         # Save
         out_dir = Path(__file__).resolve().parent / "output_images"
@@ -886,16 +965,16 @@ class PhotoBoothUI(QWidget):
         cv2.imwrite(str(out_path), strip)
 
         print(f"[Photobooth] Saved strip: {out_path}")
-        QMessageBox.information(self, "สำเร็จ! 🎉", f"บันทึก Photobooth Strip แล้ว:\n{out_path}")
+        QMessageBox.information(self, "สำเร็จ! 🎉 Photobooth Strip", f"บันทึก Photobooth Strip แล้ว:\n{out_path}\n\nถ่ายรูปใหม่ต่อได้เลย!")
 
-        self._reset_photobooth_mode()
+        # Clear captured images
+        self.captured_images = []
 
     def _reset_photobooth_mode(self):
         """Reset photobooth mode"""
         self.photobooth_mode = False
-        self.captured_images = []
         self.capture_btn.setEnabled(True)
-        self.capture_btn.setText("📸 ถ่าย 3 รูป (Photobooth Strip)")
+        self.capture_btn.setText("📸 ถ่ายภาพ")
 
     def _toggle_glasses(self):
         self.processor.props_enabled["glasses"] = self.glasses_btn.isChecked()
@@ -916,6 +995,45 @@ class PhotoBoothUI(QWidget):
         self.processor.props_enabled["logo"] = self.logo_btn.isChecked()
         status = "ON" if self.logo_btn.isChecked() else "OFF"
         print(f"Logo: {status}")
+
+    def _select_frame(self, frame_name: str):
+        """Select frame style for photobooth strip"""
+        self.current_frame_config = frame_name
+
+        # Update button states
+        self.frame_modern_btn.setChecked(frame_name == "fibooth_modern")
+        self.frame_gradient_btn.setChecked(frame_name == "fibooth_gradient")
+        self.frame_bold_btn.setChecked(frame_name == "fibooth_bold")
+
+        # Update preview
+        self._update_frame_preview(frame_name)
+
+        print(f"Frame style: {frame_name}")
+
+    def _update_frame_preview(self, frame_name: str):
+        """Update frame preview image"""
+        # Map frame names to file names
+        frame_files = {
+            "fibooth_modern": "frame_fibooth_modern.png",
+            "fibooth_gradient": "frame_fibooth_gradient.png",
+            "fibooth_bold": "frame_fibooth_bold.png"
+        }
+
+        frame_file = frame_files.get(frame_name, "frame_fibooth_modern.png")
+        frame_path = PROJECT_ROOT / "frames" / frame_file
+
+        if frame_path.exists():
+            # Load and scale frame image
+            pixmap = QPixmap(str(frame_path))
+            scaled_pixmap = pixmap.scaled(
+                self.frame_preview.size(),
+                Qt.KeepAspectRatio,
+                Qt.SmoothTransformation
+            )
+            self.frame_preview.setPixmap(scaled_pixmap)
+        else:
+            self.frame_preview.setText("No Preview")
+            print(f"[WARN] Frame preview not found: {frame_path}")
 
     # ---------- Cleanup ----------
     def closeEvent(self, event):
