@@ -4,8 +4,8 @@ from collections import deque
 from pathlib import Path
 from typing import Optional, Tuple, Dict, Any
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QSize
-from PyQt5.QtGui import QPixmap, QImage, QIcon
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QSize, QTimer
+from PyQt5.QtGui import QPixmap, QImage, QIcon, QPainter, QFont, QColor
 from PyQt5.QtWidgets import (
     QWidget, QLabel, QVBoxLayout, QHBoxLayout, QStackedWidget, QScrollArea,
     QGridLayout, QPushButton, QSlider, QFrame, QColorDialog
@@ -108,6 +108,97 @@ def load_prop(path):
         print(f"[WARN] ไม่พบไฟล์ prop: {path}")
     return im
 
+
+def create_photobooth_frame(images: list, frame_config_name="default"):
+    """Create photobooth strip with 3 images using custom frame template"""
+    import json
+
+    # Load frame configuration
+    config_path = PROJECT_ROOT / "frames" / "frame_config.json"
+
+    if config_path.exists():
+        with open(config_path, 'r', encoding='utf-8') as f:
+            configs = json.load(f)
+            config = configs.get(frame_config_name, configs.get("default"))
+    else:
+        # Default configuration if no config file
+        # Use 4:6 aspect ratio (portrait), each image keeps its original aspect ratio
+        config = {
+            "frame_path": None,
+            "image_positions": [
+                {"x": 100, "y": 150, "width": 1720, "height": 968},
+                {"x": 100, "y": 1218, "width": 1720, "height": 968},
+                {"x": 100, "y": 2286, "width": 1720, "height": 968}
+            ],
+            "canvas_size": [1920, 3404]  # 4:6 ratio with margin
+        }
+
+    frame_width, frame_height = config["canvas_size"]
+    positions = config["image_positions"]
+
+    # Load custom frame template if exists
+    frame_path = config.get("frame_path")
+    if frame_path:
+        frame_full_path = PROJECT_ROOT / frame_path
+        if frame_full_path.exists():
+            # Load frame with alpha channel
+            frame_template = cv2.imread(str(frame_full_path), cv2.IMREAD_UNCHANGED)
+            if frame_template is not None:
+                # Create canvas from frame template
+                if frame_template.shape[2] == 4:
+                    # Has alpha channel
+                    canvas = np.ones((frame_height, frame_width, 3), dtype=np.uint8) * 255
+                    # Composite frame template onto white background
+                    alpha = frame_template[:, :, 3:] / 255.0
+                    for c in range(3):
+                        canvas[:, :, c] = (alpha[:, :, 0] * frame_template[:, :, c] +
+                                          (1 - alpha[:, :, 0]) * canvas[:, :, c])
+                else:
+                    canvas = frame_template.copy()
+            else:
+                # Fallback to simple white canvas
+                canvas = np.ones((frame_height, frame_width, 3), dtype=np.uint8) * 255
+        else:
+            canvas = np.ones((frame_height, frame_width, 3), dtype=np.uint8) * 255
+    else:
+        # Simple white canvas
+        canvas = np.ones((frame_height, frame_width, 3), dtype=np.uint8) * 255
+
+    # Place images in configured positions
+    for img, pos in zip(images[:3], positions):
+        if img is not None:
+            x = pos["x"]
+            y = pos["y"]
+            target_width = pos["width"]
+            target_height = pos["height"]
+
+            # Get original image dimensions
+            img_h, img_w = img.shape[:2]
+            img_aspect = img_w / img_h
+            target_aspect = target_width / target_height
+
+            # Resize keeping aspect ratio (fit inside target area)
+            if img_aspect > target_aspect:
+                # Image is wider - fit to width
+                new_width = target_width
+                new_height = int(target_width / img_aspect)
+            else:
+                # Image is taller - fit to height
+                new_height = target_height
+                new_width = int(target_height * img_aspect)
+
+            # Resize image
+            resized = cv2.resize(img, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+            # Center the image in the target area
+            offset_x = (target_width - new_width) // 2
+            offset_y = (target_height - new_height) // 2
+
+            # Place image on canvas
+            canvas[y+offset_y:y+offset_y+new_height, x+offset_x:x+offset_x+new_width] = resized
+
+    return canvas
+
 # ---------------- Threads ----------------
 class CameraWorker(QThread):
     frame_ready = pyqtSignal(np.ndarray)
@@ -121,33 +212,52 @@ class CameraWorker(QThread):
         self.cap: Optional[cv2.VideoCapture] = None
 
     def run(self):
-        # ลอง backend ที่เสถียรบน Windows ก่อน
+        # Sony Imaging Edge Camera ต้องใช้ DSHOW และ format พิเศษ
+        print(f"[Camera] กำลังเปิดกล้อง index {self.cam_index}...")
+
+        # ลอง DSHOW ก่อน (ดีที่สุดสำหรับ Sony Imaging Edge)
         try_backends = [cv2.CAP_DSHOW, cv2.CAP_MSMF, cv2.CAP_ANY]
+
         for backend in try_backends:
+            backend_name = {cv2.CAP_DSHOW: "DSHOW", cv2.CAP_MSMF: "MSMF", cv2.CAP_ANY: "ANY"}
+            print(f"[Camera] ลอง backend: {backend_name.get(backend, backend)}")
+
             self.cap = cv2.VideoCapture(self.cam_index, backend)
             if self.cap.isOpened():
+                print(f"[Camera] ✓ เปิดกล้องสำเร็จด้วย {backend_name.get(backend, backend)}")
                 break
+            else:
+                print(f"[Camera] ✗ ไม่สามารถเปิดด้วย {backend_name.get(backend, backend)}")
 
         if not self.cap or not self.cap.isOpened():
+            print("[Camera] ERROR: ไม่สามารถเปิดกล้องได้!")
             return
 
-        # --- ตั้งค่ากล้อง (เพิ่มความละเอียด + MJPG + โฟกัส/เอ็กซ์โปเชอร์) ---
+        # --- ตั้งค่ากล้อง (สำหรับ Sony Imaging Edge) ---
+        # ลอง YUY2 ก่อน (Sony Imaging Edge มักใช้ YUY2 ดีกว่า MJPG)
         try:
-            # ขอ MJPG เพื่อลดอาการแตก/มัว (บางกล้องจะให้ bitrate สูงกว่า YUY2)
-            fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+            fourcc = cv2.VideoWriter_fourcc(*"YUY2")
             self.cap.set(cv2.CAP_PROP_FOURCC, fourcc)
+            print("[Camera] ตั้งค่า format: YUY2")
         except Exception:
             pass
 
-        # ความละเอียดสูงขึ้น (ถ้ากล้องรองรับ)
+        # ความละเอียด - เริ่มจาก 1920x1080
         self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1920)
         self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
-        # ตรวจสอบว่าตั้งได้จริง ถ้าไม่ได้จะ fallback
+
+        # ตรวจสอบว่าตั้งได้จริง
         actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        print(f"[Camera] ความละเอียดที่ได้: {actual_w}x{actual_h}")
+
         if actual_w < 1920 or actual_h < 1080:
+            # ลอง 1280x720
             self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, self.width)
             self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, self.height)
+            actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+            actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+            print(f"[Camera] Fallback ความละเอียด: {actual_w}x{actual_h}")
 
         # FPS ตามที่ตั้ง (60 ถ้ากล้องไหว)
         self.cap.set(cv2.CAP_PROP_FPS, TARGET_FPS)
@@ -163,13 +273,22 @@ class CameraWorker(QThread):
         # self.cap.set(cv2.CAP_PROP_AUTO_EXPOSURE, 0.25); self.cap.set(cv2.CAP_PROP_EXPOSURE, -6)
         # --- จบการตั้งค่ากล้อง ---
 
+        print("[Camera] เริ่มอ่านเฟรม...")
+        frame_count = 0
         while self.running:
             ok, frame = self.cap.read()
             if not ok:
+                if frame_count == 0:
+                    print("[Camera] ERROR: ไม่สามารถอ่านเฟรมได้!")
                 continue
+
+            if frame_count == 0:
+                print(f"[Camera] ✓ อ่านเฟรมสำเร็จ! ขนาด: {frame.shape}")
+
             # mirror สำหรับ photobooth
             frame = cv2.flip(frame, 1)
             self.frame_ready.emit(frame)
+            frame_count += 1
 
         if self.cap:
             self.cap.release()
@@ -417,6 +536,16 @@ class PhotoBoothUI(QWidget):
         self.filter_manager = FilterManager()
         self.outline_manager = OutlineManager()  # มี Glow แล้ว
 
+        # Photobooth mode variables
+        self.photobooth_mode = False
+        self.captured_images = []
+        self.countdown_value = 0
+        self.countdown_timer = QTimer()
+        self.countdown_timer.timeout.connect(self._countdown_tick)
+
+        # Store latest processed frame for capture (full resolution)
+        self.latest_processed_frame = None
+
         # Threads
         self.camera = CameraWorker(cam_index=camera_index, width=CAMERA_WIDTH, height=CAMERA_HEIGHT)
         self.processor = ProcessorWorker(self.segment, self.bg_manager, self.filter_manager, self.outline_manager)
@@ -447,10 +576,22 @@ class PhotoBoothUI(QWidget):
         self.video_label.setMinimumSize(640, 360)
 
         # ปุ่มถ่ายภาพ
-        self.capture_btn = QPushButton("📸 ถ่ายภาพ (Capture)")
+        self.capture_btn = QPushButton("📸 ถ่าย 3 รูป")
         self.capture_btn.setFixedHeight(48)
         self.capture_btn.setStyleSheet("font-size: 18px; font-weight: bold; background: #3f7ae0; color: white; border-radius: 12px;")
-        self.capture_btn.clicked.connect(self._capture_image)
+        self.capture_btn.clicked.connect(self._start_photobooth_sequence)
+
+        # Countdown overlay label
+        self.countdown_label = QLabel("")
+        self.countdown_label.setAlignment(Qt.AlignCenter)
+        self.countdown_label.setStyleSheet("""
+            background: rgba(0, 0, 0, 180);
+            color: white;
+            font-size: 120px;
+            font-weight: bold;
+            border-radius: 20px;
+        """)
+        self.countdown_label.hide()
 
         # Floating info (FPS)
         self.info_label = QLabel("FPS: --")
@@ -577,11 +718,27 @@ class PhotoBoothUI(QWidget):
 
         # --- Main layout ---
         main_layout = QHBoxLayout()
+
+        # Video area with countdown overlay
+        video_container = QWidget()
+        video_container_layout = QVBoxLayout(video_container)
+        video_container_layout.setContentsMargins(0, 0, 0, 0)
+
+        # Stack video and countdown
+        from PyQt5.QtWidgets import QStackedLayout
+        video_stack = QWidget()
+        video_stack_layout = QVBoxLayout(video_stack)
+        video_stack_layout.setContentsMargins(0, 0, 0, 0)
+        video_stack_layout.addWidget(self.video_label)
+        video_stack_layout.addWidget(self.countdown_label)
+        self.countdown_label.raise_()  # Bring to front
+
         video_wrap = QVBoxLayout()
-        video_wrap.addWidget(self.video_label, stretch=1)
+        video_wrap.addWidget(video_stack, stretch=1)
         video_wrap.addWidget(self.capture_btn)
         video_wrap.addWidget(self._make_line())
         video_wrap.addWidget(self.info_label, alignment=Qt.AlignLeft)
+
         main_layout.addLayout(video_wrap, stretch=3)
         main_layout.addLayout(right_panel, stretch=2)
         self.setLayout(main_layout)
@@ -607,6 +764,15 @@ class PhotoBoothUI(QWidget):
 
     @pyqtSlot(QImage)
     def _display_qimage(self, qimg: QImage):
+        # Store full resolution image for capture
+        width = qimg.width()
+        height = qimg.height()
+        ptr = qimg.bits()
+        ptr.setsize(height * width * 3)
+        arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 3))
+        self.latest_processed_frame = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+
+        # Display scaled version
         pixmap = QPixmap.fromImage(qimg)
         scaled = pixmap.scaled(self.video_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.video_label.setPixmap(scaled)
@@ -654,20 +820,82 @@ class PhotoBoothUI(QWidget):
         self.color_btn.setStyleSheet(f"background-color: rgb({c[2]}, {c[1]}, {c[0]}); min-width: 80px; min-height: 40px;")
         self.color_btn.setText("")
 
-    def _capture_image(self):
-        import os
+    def _start_photobooth_sequence(self):
+        """Start 3-shot photobooth sequence"""
+        if self.photobooth_mode:
+            return  # Already in progress
+
+        self.photobooth_mode = True
+        self.captured_images = []
+        self.capture_btn.setEnabled(False)
+        self.capture_btn.setText("⏳ กำลังถ่ายภาพ...")
+
+        # Start countdown for first shot
+        self.countdown_value = 3
+        self.countdown_label.setText(str(self.countdown_value))
+        self.countdown_label.show()
+        self.countdown_timer.start(1000)  # 1 second interval
+
+    def _countdown_tick(self):
+        """Handle countdown timer tick"""
+        self.countdown_value -= 1
+
+        if self.countdown_value > 0:
+            self.countdown_label.setText(str(self.countdown_value))
+        elif self.countdown_value == 0:
+            # Capture!
+            self.countdown_label.setText("📸")
+            QTimer.singleShot(200, self._capture_one_image)
+        else:
+            # Check if we have all 3 images
+            if len(self.captured_images) < 3:
+                # Start countdown for next shot
+                self.countdown_value = 3
+                self.countdown_label.setText(str(self.countdown_value))
+            else:
+                # All done! Create photobooth strip
+                self.countdown_timer.stop()
+                self.countdown_label.hide()
+                self._create_photobooth_strip()
+
+    def _capture_one_image(self):
+        """Capture one image from video"""
+        if self.latest_processed_frame is not None:
+            # Use full resolution processed frame
+            self.captured_images.append(self.latest_processed_frame.copy())
+            print(f"[Photobooth] Captured image {len(self.captured_images)}/3 (resolution: {self.latest_processed_frame.shape[1]}x{self.latest_processed_frame.shape[0]})")
+
+    def _create_photobooth_strip(self):
+        """Create final photobooth strip with 3 images"""
         from datetime import datetime
         from PyQt5.QtWidgets import QMessageBox
-        # สร้างโฟลเดอร์ output_images ถ้ายังไม่มี
+
+        if len(self.captured_images) < 3:
+            QMessageBox.warning(self, "ข้อผิดพลาด", "ไม่สามารถถ่ายภาพครบ 3 รูปได้")
+            self._reset_photobooth_mode()
+            return
+
+        # Create photobooth frame
+        strip = create_photobooth_frame(self.captured_images)
+
+        # Save
         out_dir = Path(__file__).resolve().parent / "output_images"
         out_dir.mkdir(exist_ok=True)
-        # ดึงภาพจาก QLabel
-        pixmap = self.video_label.pixmap()
-        if pixmap is not None:
-            now = datetime.now().strftime("%Y%m%d_%H%M%S")
-            out_path = out_dir / f"capture_{now}.png"
-            pixmap.save(str(out_path), "PNG")
-            QMessageBox.information(self, "บันทึกสำเร็จ", f"บันทึกภาพเรียบร้อยแล้ว:\n{out_path}")
+        now = datetime.now().strftime("%Y%m%d_%H%M%S")
+        out_path = out_dir / f"photobooth_strip_{now}.png"
+        cv2.imwrite(str(out_path), strip)
+
+        print(f"[Photobooth] Saved strip: {out_path}")
+        QMessageBox.information(self, "สำเร็จ! 🎉", f"บันทึก Photobooth Strip แล้ว:\n{out_path}")
+
+        self._reset_photobooth_mode()
+
+    def _reset_photobooth_mode(self):
+        """Reset photobooth mode"""
+        self.photobooth_mode = False
+        self.captured_images = []
+        self.capture_btn.setEnabled(True)
+        self.capture_btn.setText("📸 ถ่าย 3 รูป (Photobooth Strip)")
 
     def _toggle_glasses(self):
         self.processor.props_enabled["glasses"] = self.glasses_btn.isChecked()
