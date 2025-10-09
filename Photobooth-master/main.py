@@ -9,7 +9,7 @@ def main():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
     app = QApplication(sys.argv)
-    window = PhotoBoothUI(camera_index=0)  # ใช้กล้อง index 1
+    window = PhotoBoothUI(camera_index=1)  # ใช้กล้อง index 1
     window.show()
     sys.exit(app.exec_())
 

@@ -11,6 +11,9 @@ from PyQt5.QtWidgets import (
     QGridLayout, QPushButton, QSlider, QFrame, QColorDialog
 )
 
+# MediaPipe for Face Mesh
+import mediapipe as mp
+
 # ใช้แบบแพ็กเกจ managers (ให้แน่ใจว่าโฟลเดอร์และ __init__.py มีอยู่)
 from managers.background_manager import BackgroundManager
 from managers.filter_manager import FilterManager
@@ -47,6 +50,63 @@ QSlider::handle:horizontal {
 QScrollArea { border: none; }
 QFrame#line { background-color: #2a2a2a; max-height: 2px; min-height: 2px; }
 """
+
+# ---------------- Props/MediaPipe Functions ----------------
+def overlay_transparent(background, overlay, x, y, overlay_size=None):
+    """Overlay transparent image with alpha channel (optimized)"""
+    if overlay is None:
+        return background
+
+    bg_h, bg_w = background.shape[:2]
+
+    # Optimize: resize only if needed
+    if overlay_size is not None:
+        # Use INTER_LINEAR for speed (good quality for downscaling)
+        overlay = cv2.resize(overlay, overlay_size, interpolation=cv2.INTER_LINEAR)
+
+    # Optimize: expect BGRA format (pre-converted)
+    if overlay.ndim == 2:
+        overlay = cv2.cvtColor(overlay, cv2.COLOR_GRAY2BGRA)
+    elif overlay.shape[2] == 3:
+        overlay = np.concatenate([overlay, np.ones((overlay.shape[0], overlay.shape[1], 1), dtype=overlay.dtype)*255], axis=2)
+
+    o_h, o_w = overlay.shape[:2]
+
+    # Early exit if completely out of bounds
+    if x >= bg_w or y >= bg_h or x + o_w <= 0 or y + o_h <= 0:
+        return background
+
+    # Calculate intersection
+    x1, y1 = max(x, 0), max(y, 0)
+    x2, y2 = min(x + o_w, bg_w), min(y + o_h, bg_h)
+    ov_x1, ov_y1 = x1 - x, y1 - y
+    ov_x2, ov_y2 = ov_x1 + (x2 - x1), ov_y1 + (y2 - y1)
+
+    overlay_crop = overlay[int(ov_y1):int(ov_y2), int(ov_x1):int(ov_x2)]
+    if overlay_crop.size == 0:
+        return background
+
+    bg_crop = background[int(y1):int(y2), int(x1):int(x2)]
+
+    # Optimize: use in-place operations where possible
+    alpha = overlay_crop[:, :, 3:] / 255.0
+    alpha_inv = 1.0 - alpha
+
+    # Vectorized blending (faster than explicit loops)
+    for c in range(3):
+        bg_crop[:, :, c] = (alpha[:, :, 0] * overlay_crop[:, :, c] +
+                           alpha_inv[:, :, 0] * bg_crop[:, :, c])
+
+    background[int(y1):int(y2), int(x1):int(x2)] = bg_crop
+    return background
+
+
+def load_prop(path):
+    """Load prop image with alpha channel"""
+    im = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+    if im is None:
+        print(f"[WARN] ไม่พบไฟล์ prop: {path}")
+    return im
 
 # ---------------- Threads ----------------
 class CameraWorker(QThread):
@@ -136,6 +196,52 @@ class ProcessorWorker(QThread):
         # sharpen อ่อนๆ
         self.enable_sharpen = True
 
+        # MediaPipe Face Mesh (optimized for speed)
+        mp_face_mesh = mp.solutions.face_mesh
+        self.face_mesh = mp_face_mesh.FaceMesh(
+            static_image_mode=False,
+            max_num_faces=3,  # Reduce from 6 to 3 for better performance
+            refine_landmarks=False,  # Disable refinement for speed
+            min_detection_confidence=0.4,  # Slightly lower for faster detection
+            min_tracking_confidence=0.4
+        )
+
+        # Frame skip for face detection (process every N frames)
+        self.face_frame_skip = 2  # Process face detection every 2 frames
+        self.face_frame_counter = 0
+        self.cached_landmarks = None  # Cache last detected landmarks
+
+        # Load props and pre-convert to BGRA for faster overlay
+        self.props = {}
+        props_files = {
+            "glasses": "black-eyeglasses-frame-png.webp",
+            "mustache": "pngimg.com - moustache_PNG43.png",
+            "hat": "Black_Top_Hat_PNG_Clip_Art-1381.png"
+        }
+        for key, filename in props_files.items():
+            prop = load_prop(str(PROJECT_ROOT / "props" / filename))
+            if prop is not None:
+                # Ensure BGRA format for faster processing
+                if prop.shape[2] == 3:
+                    prop = cv2.cvtColor(prop, cv2.COLOR_BGR2BGRA)
+            self.props[key] = prop
+
+        # Logo
+        logo_path = PROJECT_ROOT / "icon" / "logo-fac_logo-fibo.png"
+        if not logo_path.exists():
+            # Fallback: check for icon subdirectory
+            logo_path = PROJECT_ROOT / "icon" / "icon" / "logo-fac_logo-fibo.png"
+        self.logo = load_prop(str(logo_path)) if logo_path.exists() else None
+        self.logo_size = (640, 240)
+
+        # Props toggles
+        self.props_enabled = {
+            "glasses": False,
+            "mustache": False,
+            "hat": False,
+            "logo": False
+        }
+
     @pyqtSlot(np.ndarray, dict)
     def enqueue(self, frame: np.ndarray, settings: dict):
         self.queue.append((frame, settings))
@@ -192,10 +298,102 @@ class ProcessorWorker(QThread):
         # ฟิลเตอร์
         frame = self.filter_manager.apply_filter(frame, current_filter)
 
+        # Apply virtual props (glasses, mustache, hat)
+        frame = self._apply_props(frame)
+
         # sharpen (unsharp mask อ่อนๆ)
         if self.enable_sharpen:
             blur = cv2.GaussianBlur(frame, (0, 0), 0.8)
             frame = cv2.addWeighted(frame, 1.22, blur, -0.22, 0)
+
+        return frame
+
+    def _apply_props(self, frame: np.ndarray) -> np.ndarray:
+        """Apply virtual props using MediaPipe Face Mesh (optimized)"""
+        # Check if any props are enabled
+        if not any(self.props_enabled.values()):
+            return frame
+
+        h, w = frame.shape[:2]
+
+        # Frame skip optimization: only detect faces every N frames
+        self.face_frame_counter += 1
+        if self.face_frame_counter >= self.face_frame_skip:
+            self.face_frame_counter = 0
+            # Only convert to RGB when actually processing
+            rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+            results = self.face_mesh.process(rgb_frame)
+
+            if results.multi_face_landmarks:
+                # Cache landmarks for next frames
+                self.cached_landmarks = []
+                for face_landmarks in results.multi_face_landmarks:
+                    lm = face_landmarks.landmark
+                    landmarks = np.array([[p.x * w, p.y * h] for p in lm])
+                    if not np.any(np.isnan(landmarks)):
+                        self.cached_landmarks.append(landmarks)
+            else:
+                self.cached_landmarks = None
+
+        # Use cached landmarks for rendering
+        if self.cached_landmarks:
+            for landmarks in self.cached_landmarks:
+
+                # Apply glasses
+                if self.props_enabled.get("glasses", False):
+                    try:
+                        left_eye = landmarks[33]
+                        right_eye = landmarks[263]
+                        eye_dist = np.linalg.norm(right_eye - left_eye)
+                        eye_center = ((left_eye + right_eye) / 2).astype(int)
+
+                        if self.props["glasses"] is not None:
+                            glasses_w = int(eye_dist * 2.2)
+                            glasses_h = int(glasses_w * self.props["glasses"].shape[0] / self.props["glasses"].shape[1])
+                            gx = int(eye_center[0] - glasses_w / 2)
+                            gy = int(eye_center[1] - glasses_h / 2)
+                            frame = overlay_transparent(frame, self.props["glasses"], gx, gy, overlay_size=(glasses_w, glasses_h))
+                    except Exception:
+                        pass
+
+                # Apply hat
+                if self.props_enabled.get("hat", False):
+                    try:
+                        left_eye = landmarks[33]
+                        right_eye = landmarks[263]
+                        eye_dist = np.linalg.norm(right_eye - left_eye)
+                        forehead = landmarks[10]
+                        chin = landmarks[152]
+                        head_h = max(1, int(np.linalg.norm(forehead - chin)))
+                        hat_w = int(eye_dist * 2.6)
+                        hat_h = int(hat_w * (self.props["hat"].shape[0] / self.props["hat"].shape[1])) if self.props["hat"] is not None else int(head_h * 0.6)
+                        hx = int(forehead[0] - hat_w / 2)
+                        hy = int(forehead[1] - hat_h * 0.85)
+                        if self.props["hat"] is not None:
+                            frame = overlay_transparent(frame, self.props["hat"], hx, hy, overlay_size=(hat_w, hat_h))
+                    except Exception:
+                        pass
+
+                # Apply mustache
+                if self.props_enabled.get("mustache", False):
+                    try:
+                        left_eye = landmarks[33]
+                        right_eye = landmarks[263]
+                        eye_dist = np.linalg.norm(right_eye - left_eye)
+                        mouth_upper = landmarks[13]
+                        nose_bottom = landmarks[2]
+                        must_w = int(eye_dist * 1.0)
+                        must_h = int(must_w * (self.props["mustache"].shape[0] / self.props["mustache"].shape[1])) if self.props["mustache"] is not None else int(must_w * 0.3)
+                        mx = int(mouth_upper[0] - must_w / 2)
+                        my = int(nose_bottom[1] + (mouth_upper[1] - nose_bottom[1]) * 0.001)
+                        if self.props["mustache"] is not None:
+                            frame = overlay_transparent(frame, self.props["mustache"], mx, my, overlay_size=(must_w, must_h))
+                    except Exception:
+                        pass
+
+        # Apply logo
+        if self.props_enabled.get("logo", False) and self.logo is not None:
+            frame = overlay_transparent(frame, self.logo, 0, 10, overlay_size=self.logo_size)
 
         return frame
 
@@ -238,6 +436,7 @@ class PhotoBoothUI(QWidget):
     # ---------- UI Building ----------
     def _init_ui(self):
         from PyQt5.QtWidgets import QColorDialog
+        import os
         self.setWindowTitle("Photobooth")
         self.showMaximized()
 
@@ -246,6 +445,12 @@ class PhotoBoothUI(QWidget):
         self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setStyleSheet("background-color: black;")
         self.video_label.setMinimumSize(640, 360)
+
+        # ปุ่มถ่ายภาพ
+        self.capture_btn = QPushButton("📸 ถ่ายภาพ (Capture)")
+        self.capture_btn.setFixedHeight(48)
+        self.capture_btn.setStyleSheet("font-size: 18px; font-weight: bold; background: #3f7ae0; color: white; border-radius: 12px;")
+        self.capture_btn.clicked.connect(self._capture_image)
 
         # Floating info (FPS)
         self.info_label = QLabel("FPS: --")
@@ -314,6 +519,46 @@ class PhotoBoothUI(QWidget):
             filter_row.addWidget(btn)
         filter_section.addLayout(filter_row)
 
+        # --- Props Section ---
+        props_section = QVBoxLayout()
+        props_title = QLabel("🎭 Virtual Props")
+        props_title.setProperty("section", True)
+        props_title.setAlignment(Qt.AlignCenter)
+        props_section.addWidget(props_title)
+
+        props_grid = QGridLayout()
+        props_grid.setSpacing(10)
+
+        # Glasses button
+        self.glasses_btn = QPushButton("👓 Glasses")
+        self.glasses_btn.setCheckable(True)
+        self.glasses_btn.setFixedSize(120, 60)
+        self.glasses_btn.clicked.connect(self._toggle_glasses)
+        props_grid.addWidget(self.glasses_btn, 0, 0)
+
+        # Hat button
+        self.hat_btn = QPushButton("🎩 Hat")
+        self.hat_btn.setCheckable(True)
+        self.hat_btn.setFixedSize(120, 60)
+        self.hat_btn.clicked.connect(self._toggle_hat)
+        props_grid.addWidget(self.hat_btn, 0, 1)
+
+        # Mustache button
+        self.mustache_btn = QPushButton("🥸 Mustache")
+        self.mustache_btn.setCheckable(True)
+        self.mustache_btn.setFixedSize(120, 60)
+        self.mustache_btn.clicked.connect(self._toggle_mustache)
+        props_grid.addWidget(self.mustache_btn, 1, 0)
+
+        # Logo button
+        self.logo_btn = QPushButton("🏢 Logo")
+        self.logo_btn.setCheckable(True)
+        self.logo_btn.setFixedSize(120, 60)
+        self.logo_btn.clicked.connect(self._toggle_logo)
+        props_grid.addWidget(self.logo_btn, 1, 1)
+
+        props_section.addLayout(props_grid)
+
         # --- Assemble right panel ---
         right_panel = QVBoxLayout()
         title = QLabel("Photobooth")
@@ -326,12 +571,15 @@ class PhotoBoothUI(QWidget):
         right_panel.addLayout(outline_section)
         right_panel.addSpacing(16)
         right_panel.addLayout(filter_section)
+        right_panel.addSpacing(16)
+        right_panel.addLayout(props_section)
         right_panel.addStretch()
 
         # --- Main layout ---
         main_layout = QHBoxLayout()
         video_wrap = QVBoxLayout()
         video_wrap.addWidget(self.video_label, stretch=1)
+        video_wrap.addWidget(self.capture_btn)
         video_wrap.addWidget(self._make_line())
         video_wrap.addWidget(self.info_label, alignment=Qt.AlignLeft)
         main_layout.addLayout(video_wrap, stretch=3)
@@ -405,6 +653,41 @@ class PhotoBoothUI(QWidget):
         c = self.outline_manager.current_color
         self.color_btn.setStyleSheet(f"background-color: rgb({c[2]}, {c[1]}, {c[0]}); min-width: 80px; min-height: 40px;")
         self.color_btn.setText("")
+
+    def _capture_image(self):
+        import os
+        from datetime import datetime
+        from PyQt5.QtWidgets import QMessageBox
+        # สร้างโฟลเดอร์ output_images ถ้ายังไม่มี
+        out_dir = Path(__file__).resolve().parent / "output_images"
+        out_dir.mkdir(exist_ok=True)
+        # ดึงภาพจาก QLabel
+        pixmap = self.video_label.pixmap()
+        if pixmap is not None:
+            now = datetime.now().strftime("%Y%m%d_%H%M%S")
+            out_path = out_dir / f"capture_{now}.png"
+            pixmap.save(str(out_path), "PNG")
+            QMessageBox.information(self, "บันทึกสำเร็จ", f"บันทึกภาพเรียบร้อยแล้ว:\n{out_path}")
+
+    def _toggle_glasses(self):
+        self.processor.props_enabled["glasses"] = self.glasses_btn.isChecked()
+        status = "ON" if self.glasses_btn.isChecked() else "OFF"
+        print(f"Glasses: {status}")
+
+    def _toggle_hat(self):
+        self.processor.props_enabled["hat"] = self.hat_btn.isChecked()
+        status = "ON" if self.hat_btn.isChecked() else "OFF"
+        print(f"Hat: {status}")
+
+    def _toggle_mustache(self):
+        self.processor.props_enabled["mustache"] = self.mustache_btn.isChecked()
+        status = "ON" if self.mustache_btn.isChecked() else "OFF"
+        print(f"Mustache: {status}")
+
+    def _toggle_logo(self):
+        self.processor.props_enabled["logo"] = self.logo_btn.isChecked()
+        status = "ON" if self.logo_btn.isChecked() else "OFF"
+        print(f"Logo: {status}")
 
     # ---------- Cleanup ----------
     def closeEvent(self, event):
