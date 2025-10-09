@@ -7,7 +7,7 @@ from typing import Optional, Tuple, Dict, Any
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QSize, QTimer
 from PyQt5.QtGui import QPixmap, QImage, QIcon, QPainter, QFont, QColor
 from PyQt5.QtWidgets import (
-    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QStackedWidget, QScrollArea,
+    QWidget, QLabel, QVBoxLayout, QHBoxLayout, QStackedWidget,
     QGridLayout, QPushButton, QSlider, QFrame, QColorDialog
 )
 
@@ -64,9 +64,6 @@ QSlider::groove:horizontal {
 }
 QSlider::handle:horizontal {
     background: #ff8c00; width: 16px; border-radius: 8px; margin: -6px 0;
-}
-QScrollArea {
-    border: none; background-color: #ffffff;
 }
 QFrame#line {
     background-color: #ffe6cc; max-height: 2px; min-height: 2px;
@@ -545,7 +542,7 @@ class PhotoBoothUI(QWidget):
         self.countdown_value = 0
         self.countdown_timer = QTimer()
         self.countdown_timer.timeout.connect(self._countdown_tick)
-        self.current_frame_config = "fibooth_modern"  # Default frame
+        self.current_frame_config = "fibooth_gradient"  # Default frame
 
         # Store latest processed frame for capture (full resolution)
         self.latest_processed_frame = None
@@ -627,9 +624,7 @@ class PhotoBoothUI(QWidget):
         bg_title.setProperty("section", True)
         bg_title.setAlignment(Qt.AlignCenter)
         bg_section.addWidget(bg_title)
-        bg_scroll = QScrollArea()
-        bg_scroll.setWidgetResizable(True)
-        bg_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        # Changed: Use regular widget without scroll, show all in grid
         bg_content = QWidget()
         bg_grid = QGridLayout(bg_content)
         bg_grid.setSpacing(10)
@@ -642,8 +637,7 @@ class PhotoBoothUI(QWidget):
             btn.setToolTip(path)
             btn.clicked.connect(lambda checked=False, p=path: self.bg_manager.set_background(p))
             bg_grid.addWidget(btn, i // 3, i % 3)
-        bg_scroll.setWidget(bg_content)
-        bg_section.addWidget(bg_scroll)
+        bg_section.addWidget(bg_content)
 
         # --- Outline Section ---
         outline_section = QVBoxLayout()
@@ -732,30 +726,24 @@ class PhotoBoothUI(QWidget):
         frame_grid = QGridLayout()
         frame_grid.setSpacing(10)
 
-        # Frame buttons
-        self.frame_modern_btn = QPushButton("Modern")
-        self.frame_modern_btn.setCheckable(True)
-        self.frame_modern_btn.setChecked(True)
-        self.frame_modern_btn.setFixedSize(120, 60)
-        self.frame_modern_btn.clicked.connect(lambda: self._select_frame("fibooth_modern"))
-        frame_grid.addWidget(self.frame_modern_btn, 0, 0)
-
+        # Frame buttons (Gradient and Bold only)
         self.frame_gradient_btn = QPushButton("Gradient")
         self.frame_gradient_btn.setCheckable(True)
+        self.frame_gradient_btn.setChecked(True)  # Default
         self.frame_gradient_btn.setFixedSize(120, 60)
         self.frame_gradient_btn.clicked.connect(lambda: self._select_frame("fibooth_gradient"))
-        frame_grid.addWidget(self.frame_gradient_btn, 0, 1)
+        frame_grid.addWidget(self.frame_gradient_btn, 0, 0)
 
         self.frame_bold_btn = QPushButton("Bold")
         self.frame_bold_btn.setCheckable(True)
         self.frame_bold_btn.setFixedSize(120, 60)
         self.frame_bold_btn.clicked.connect(lambda: self._select_frame("fibooth_bold"))
-        frame_grid.addWidget(self.frame_bold_btn, 1, 0)
+        frame_grid.addWidget(self.frame_bold_btn, 0, 1)
 
         frame_section.addLayout(frame_grid)
 
         # Load initial frame preview
-        self._update_frame_preview("fibooth_modern")
+        self._update_frame_preview("fibooth_gradient")
 
         # --- Assemble right panel ---
         right_panel = QVBoxLayout()
@@ -1001,7 +989,6 @@ class PhotoBoothUI(QWidget):
         self.current_frame_config = frame_name
 
         # Update button states
-        self.frame_modern_btn.setChecked(frame_name == "fibooth_modern")
         self.frame_gradient_btn.setChecked(frame_name == "fibooth_gradient")
         self.frame_bold_btn.setChecked(frame_name == "fibooth_bold")
 
@@ -1014,12 +1001,11 @@ class PhotoBoothUI(QWidget):
         """Update frame preview image"""
         # Map frame names to file names
         frame_files = {
-            "fibooth_modern": "frame_fibooth_modern.png",
             "fibooth_gradient": "frame_fibooth_gradient.png",
             "fibooth_bold": "frame_fibooth_bold.png"
         }
 
-        frame_file = frame_files.get(frame_name, "frame_fibooth_modern.png")
+        frame_file = frame_files.get(frame_name, "frame_fibooth_gradient.png")
         frame_path = PROJECT_ROOT / "frames" / frame_file
 
         if frame_path.exists():

@@ -12,11 +12,11 @@ from pathlib import Path
 FRAME_WIDTH = 1920
 FRAME_HEIGHT = 2880
 
-# Image positions (3 photos)
+# Image positions (3 photos) - Match frame_config.json
 IMAGE_POSITIONS = [
-    {"x": 160, "y": 280, "width": 1600, "height": 900},
-    {"x": 160, "y": 1230, "width": 1600, "height": 900},
-    {"x": 160, "y": 2180, "width": 1600, "height": 900}
+    {"x": 160, "y": 250, "width": 1600, "height": 800},
+    {"x": 160, "y": 1090, "width": 1600, "height": 800},
+    {"x": 160, "y": 1930, "width": 1600, "height": 800}
 ]
 
 # Colors (Orange and White theme for KMUTT)
@@ -130,8 +130,8 @@ def create_frame_gradient():
         draw.text((FRAME_WIDTH//2 + 3, 113), "FIBOOTH", fill=BLACK, font=title_font, anchor="mm")
         draw.text((FRAME_WIDTH//2, 110), "FIBOOTH", fill=ORANGE, font=title_font, anchor="mm")
 
-        # Subtitle
-        draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 100), "KMUTT OPENHOUSE 2025", fill=DARK_ORANGE, font=subtitle_font, anchor="mm")
+        # Subtitle - Changed to ORANGE for better visibility
+        draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 100), "KMUTT OPENHOUSE 2025", fill=ORANGE, font=subtitle_font, anchor="mm")
         draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 40), "10-12 OCTOBER", fill=ORANGE, font=info_font, anchor="mm")
 
     except Exception as e:
@@ -197,10 +197,10 @@ def create_frame_bold():
         # Header text
         draw.text((FRAME_WIDTH//2, 125), "FIBOOTH", fill=WHITE, font=title_font, anchor="mm")
 
-        # Footer text
-        draw.text((FRAME_WIDTH//2, footer_y + 60), "KMUTT", fill=WHITE, font=subtitle_font, anchor="mm")
-        draw.text((FRAME_WIDTH//2, footer_y + 130), "OPENHOUSE 2025", fill=WHITE, font=info_font, anchor="mm")
-        draw.text((FRAME_WIDTH//2, footer_y + 175), "10-12 OCTOBER", fill=ORANGE, font=info_font, anchor="mm")
+        # Footer text - Changed to BLACK for better visibility
+        draw.text((FRAME_WIDTH//2, footer_y + 60), "KMUTT", fill=BLACK, font=subtitle_font, anchor="mm")
+        draw.text((FRAME_WIDTH//2, footer_y + 130), "OPENHOUSE 2025", fill=BLACK, font=info_font, anchor="mm")
+        draw.text((FRAME_WIDTH//2, footer_y + 175), "10-12 OCTOBER", fill=BLACK, font=info_font, anchor="mm")
 
     except Exception as e:
         print(f"Warning: Could not add text - {e}")
@@ -209,28 +209,22 @@ def create_frame_bold():
 
 
 def main():
-    """Generate all three frame designs"""
+    """Generate frame designs (Gradient and Bold only)"""
     frames_dir = Path(__file__).parent / "frames"
     frames_dir.mkdir(exist_ok=True)
 
     print("Creating FIBOOTH frame designs...")
 
-    # Frame 1: Modern
-    print("  Creating frame 1: Modern Minimalist...")
-    frame1 = create_frame_modern()
-    cv2.imwrite(str(frames_dir / "frame_fibooth_modern.png"), frame1)
-    print("    ✓ Saved: frame_fibooth_modern.png")
-
-    # Frame 2: Gradient
-    print("  Creating frame 2: Gradient Style...")
-    frame2 = create_frame_gradient()
-    cv2.imwrite(str(frames_dir / "frame_fibooth_gradient.png"), frame2)
+    # Frame 1: Gradient
+    print("  Creating frame 1: Gradient Style...")
+    frame1 = create_frame_gradient()
+    cv2.imwrite(str(frames_dir / "frame_fibooth_gradient.png"), frame1)
     print("    ✓ Saved: frame_fibooth_gradient.png")
 
-    # Frame 3: Bold
-    print("  Creating frame 3: Bold Design...")
-    frame3 = create_frame_bold()
-    cv2.imwrite(str(frames_dir / "frame_fibooth_bold.png"), frame3)
+    # Frame 2: Bold
+    print("  Creating frame 2: Bold Design...")
+    frame2 = create_frame_bold()
+    cv2.imwrite(str(frames_dir / "frame_fibooth_bold.png"), frame2)
     print("    ✓ Saved: frame_fibooth_bold.png")
 
     # Update config file
@@ -240,18 +234,12 @@ def main():
     with open(config_path, 'r', encoding='utf-8') as f:
         config = json.load(f)
 
-    # Add new frame configurations
+    # Add new frame configurations (matching IMAGE_POSITIONS)
     new_positions = [
-        {"x": 160, "y": 280, "width": 1600, "height": 900},
-        {"x": 160, "y": 1230, "width": 1600, "height": 900},
-        {"x": 160, "y": 2180, "width": 1600, "height": 900}
+        {"x": 160, "y": 250, "width": 1600, "height": 800},
+        {"x": 160, "y": 1090, "width": 1600, "height": 800},
+        {"x": 160, "y": 1930, "width": 1600, "height": 800}
     ]
-
-    config["fibooth_modern"] = {
-        "frame_path": "frames/frame_fibooth_modern.png",
-        "image_positions": new_positions,
-        "canvas_size": [FRAME_WIDTH, FRAME_HEIGHT]
-    }
 
     config["fibooth_gradient"] = {
         "frame_path": "frames/frame_fibooth_gradient.png",
@@ -271,7 +259,6 @@ def main():
     print("\n✓ All frames created successfully!")
     print("✓ Updated frame_config.json")
     print("\nYou can now use these frames in the photobooth:")
-    print("  - fibooth_modern")
     print("  - fibooth_gradient")
     print("  - fibooth_bold")
 

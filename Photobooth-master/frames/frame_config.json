@@ -80,33 +80,6 @@
       2560
     ]
   },
-  "fibooth_modern": {
-    "frame_path": "frames/frame_fibooth_modern.png",
-    "image_positions": [
-      {
-        "x": 160,
-        "y": 250,
-        "width": 1600,
-        "height": 800
-      },
-      {
-        "x": 160,
-        "y": 1090,
-        "width": 1600,
-        "height": 800
-      },
-      {
-        "x": 160,
-        "y": 1930,
-        "width": 1600,
-        "height": 800
-      }
-    ],
-    "canvas_size": [
-      1920,
-      2880
-    ]
-  },
   "fibooth_gradient": {
     "frame_path": "frames/frame_fibooth_gradient.png",
     "image_positions": [

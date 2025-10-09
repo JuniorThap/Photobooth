@@ -10,7 +10,7 @@ def main():
 
     app = QApplication(sys.argv)
     window = PhotoBoothUI(camera_index=0)  # 0 = Laptop Webcam
-    window.show()
+    window.showFullScreen()  # Full screen mode
     sys.exit(app.exec_())
 
 if __name__ == "__main__":
