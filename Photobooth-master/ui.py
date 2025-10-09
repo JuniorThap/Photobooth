@@ -923,7 +923,7 @@ class PhotoBoothUI(QWidget):
             out_dir.mkdir(exist_ok=True)
             now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]  # Include milliseconds
             out_path = out_dir / f"photo_{now}.png"
-            cv2.imwrite(str(out_path), self.latest_processed_frame)
+            # cv2.imwrite(str(out_path), self.latest_processed_frame)
 
             print(f"[Photobooth] Saved photo: {out_path}")
             QMessageBox.information(self, "สำเร็จ! 🎉", f"บันทึกรูปภาพแล้ว:\n{out_path}\n\nรูปที่ {len(self.captured_images)}/3 สำหรับ Photobooth Strip")

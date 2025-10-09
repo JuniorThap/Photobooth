@@ -67,7 +67,7 @@ def create_frame_modern():
         draw.text((FRAME_WIDTH//2, 110), "FIBOOTH", fill=WHITE, font=title_font, anchor="mm")
 
         # Footer text
-        draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 110), "KMUTT", fill=WHITE, font=subtitle_font, anchor="mm")
+        draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 110), "FIBO (KMUTT)", fill=WHITE, font=subtitle_font, anchor="mm")
         draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 60), "OPENHOUSE 2025 | 10-12 OCTOBER", fill=WHITE, font=info_font, anchor="mm")
 
     except Exception as e:
@@ -131,7 +131,7 @@ def create_frame_gradient():
         draw.text((FRAME_WIDTH//2, 110), "FIBOOTH", fill=ORANGE, font=title_font, anchor="mm")
 
         # Subtitle - Changed to ORANGE for better visibility
-        draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 100), "KMUTT OPENHOUSE 2025", fill=ORANGE, font=subtitle_font, anchor="mm")
+        draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 100), "FIBO (KMUTT) OPENHOUSE 2025", fill=ORANGE, font=subtitle_font, anchor="mm")
         draw.text((FRAME_WIDTH//2, FRAME_HEIGHT - 40), "10-12 OCTOBER", fill=ORANGE, font=info_font, anchor="mm")
 
     except Exception as e:
@@ -198,7 +198,7 @@ def create_frame_bold():
         draw.text((FRAME_WIDTH//2, 125), "FIBOOTH", fill=WHITE, font=title_font, anchor="mm")
 
         # Footer text - Changed to BLACK for better visibility
-        draw.text((FRAME_WIDTH//2, footer_y + 60), "KMUTT", fill=BLACK, font=subtitle_font, anchor="mm")
+        draw.text((FRAME_WIDTH//2, footer_y + 60), "FIBO (KMUTT)", fill=BLACK, font=subtitle_font, anchor="mm")
         draw.text((FRAME_WIDTH//2, footer_y + 130), "OPENHOUSE 2025", fill=BLACK, font=info_font, anchor="mm")
         draw.text((FRAME_WIDTH//2, footer_y + 175), "10-12 OCTOBER", fill=BLACK, font=info_font, anchor="mm")
 
