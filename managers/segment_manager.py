@@ -1,5 +1,5 @@
 import torch
-from humansegment_unet import Segment
+from models.humansegment_unet import Segment
 
 def create_segment():
     device = "cuda" if torch.cuda.is_available() else "cpu"
