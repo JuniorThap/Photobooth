@@ -5,10 +5,10 @@ from pathlib import Path
 from typing import Optional, Tuple
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QSize, QTimer
-from PyQt5.QtGui import QPixmap, QImage, QIcon
+from PyQt5.QtGui import QPixmap, QImage, QIcon, QFont
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QPushButton, QFrame, QColorDialog, QScrollArea
+    QPushButton, QFrame, QColorDialog, QScrollArea, QSizePolicy
 )
 
 from managers.background_manager import BackgroundManager
@@ -20,23 +20,126 @@ from managers.face_manager import FaceManager
 from core.ProcessorWorker import ProcessorWorker
 from core.CameraWorker import CameraWorker
 
-from ui.qss_theme import ORANGE_WHITE_QSS
-
 # ---------------- UI/Camera Parameters ----------------
 CAMERA_INDEX = 2
 CAMERA_WIDTH = 1280
 CAMERA_HEIGHT = 720
 TARGET_FPS = 60
 
-UI_SCALE = 0.75
-def S(x: int) -> int:
-    return int(x * UI_SCALE)
-
-THUMBNAIL_SIZE = QSize(S(150), S(100))
-BUTTON_SIZE = (S(160), S(110))
-
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BG_ROOT = PROJECT_ROOT / "resources" / "backgrounds" / "photos"
+
+# FRAB8 Graduation Theme Colors
+FRAB8_GOLD = "#D4AF37"
+FRAB8_NAVY = "#1A1F3A"
+FRAB8_LIGHT_GOLD = "#F4E4C1"
+FRAB8_DARK_NAVY = "#0F1423"
+FRAB8_WHITE = "#FFFFFF"
+FRAB8_ACCENT = "#8B7355"
+
+# Graduation themed QSS
+FRAB8_GRADUATION_QSS = f"""
+QWidget {{
+    background-color: {FRAB8_NAVY};
+    color: {FRAB8_WHITE};
+    font-family: 'Segoe UI', Arial, sans-serif;
+}}
+
+QPushButton {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 {FRAB8_GOLD}, stop:1 {FRAB8_ACCENT});
+    color: {FRAB8_DARK_NAVY};
+    border: 2px solid {FRAB8_GOLD};
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-weight: bold;
+    font-size: 14px;
+}}
+
+QPushButton:hover {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 {FRAB8_LIGHT_GOLD}, stop:1 {FRAB8_GOLD});
+    border: 2px solid {FRAB8_LIGHT_GOLD};
+}}
+
+QPushButton:pressed {{
+    background: {FRAB8_ACCENT};
+}}
+
+QPushButton:checked {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #4A7C59, stop:1 #2D5A3D);
+    border: 2px solid #5A9C6F;
+    color: white;
+}}
+
+QPushButton:disabled {{
+    background: #555555;
+    color: #888888;
+    border: 2px solid #666666;
+}}
+
+QLabel[hero="true"] {{
+    font-size: 48px;
+    font-weight: bold;
+    color: {FRAB8_GOLD};
+    font-family: 'Georgia', serif;
+    text-transform: uppercase;
+    letter-spacing: 3px;
+}}
+
+QLabel[section="true"] {{
+    font-size: 20px;
+    font-weight: bold;
+    color: {FRAB8_GOLD};
+    padding: 12px;
+    background: {FRAB8_DARK_NAVY};
+    border: 2px solid {FRAB8_GOLD};
+    border-radius: 8px;
+    margin: 8px 0;
+}}
+
+QLabel[subtitle="true"] {{
+    font-size: 16px;
+    color: {FRAB8_LIGHT_GOLD};
+    font-weight: 600;
+}}
+
+QFrame#line {{
+    background-color: {FRAB8_GOLD};
+    max-height: 2px;
+    margin: 10px 0;
+}}
+
+QScrollArea {{
+    border: none;
+    background: {FRAB8_NAVY};
+}}
+
+QScrollBar:vertical {{
+    border: none;
+    background: {FRAB8_DARK_NAVY};
+    width: 12px;
+    margin: 0;
+}}
+
+QScrollBar::handle:vertical {{
+    background: {FRAB8_GOLD};
+    border-radius: 6px;
+    min-height: 30px;
+}}
+
+QScrollBar::handle:vertical:hover {{
+    background: {FRAB8_LIGHT_GOLD};
+}}
+
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
+    height: 0px;
+}}
+"""
+
+THUMBNAIL_SIZE = QSize(180, 120)
+BUTTON_SIZE = (190, 130)
 
 
 def create_photobooth_frame(images: list, frame_config_name="fibooth_modern"):
@@ -104,62 +207,142 @@ class DisplayWindow(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FIBOOTH - Display")
-        self.setStyleSheet(ORANGE_WHITE_QSS)
+        self.setWindowTitle("FRAB8 Graduation PhotoBooth - Display")
+        self.setStyleSheet(FRAB8_GRADUATION_QSS)
         
-        # Set window to be large and centered
-        screen = QApplication.primaryScreen().availableGeometry()
-        self.resize(int(screen.width() * 0.6), int(screen.height() * 0.8))
+        # Make fullscreen
+        self.showFullScreen()
         
         # Main layout
         layout = QVBoxLayout()
-        layout.setContentsMargins(20, 20, 20, 20)
+        layout.setContentsMargins(30, 30, 30, 30)
+        layout.setSpacing(20)
+        
+        # Header with graduation theme
+        header = QLabel("🎓 FRAB8 GRADUATION 2025 🎓")
+        header.setProperty("hero", True)
+        header.setAlignment(Qt.AlignCenter)
+        layout.addWidget(header)
         
         # Video preview
         self.video_label = QLabel()
         self.video_label.setAlignment(Qt.AlignCenter)
-        self.video_label.setStyleSheet("""
+        self.video_label.setStyleSheet(f"""
             background-color: black;
-            border: 5px solid #ff8c00;
-            border-radius: 15px;
+            border: 6px solid {FRAB8_GOLD};
+            border-radius: 20px;
         """)
-        self.video_label.setMinimumSize(800, 600)
+        self.video_label.setScaledContents(False)
+        self.video_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
         
         # Countdown overlay
         self.countdown_label = QLabel("")
         self.countdown_label.setAlignment(Qt.AlignCenter)
-        self.countdown_label.setStyleSheet("""
-            background: rgba(0, 0, 0, 180);
-            color: white;
-            font-size: 150px;
+        self.countdown_label.setStyleSheet(f"""
+            background: rgba(26, 31, 58, 220);
+            color: {FRAB8_GOLD};
+            font-size: 180px;
             font-weight: bold;
-            border-radius: 20px;
+            border: 5px solid {FRAB8_GOLD};
+            border-radius: 25px;
         """)
         self.countdown_label.hide()
         
+        # QR Code display
+        self.qr_label = QLabel()
+        self.qr_label.setAlignment(Qt.AlignCenter)
+        self.qr_label.setStyleSheet(f"""
+            background: white;
+            border: 5px solid {FRAB8_GOLD};
+            border-radius: 15px;
+            padding: 20px;
+        """)
+        self.qr_label.hide()
+        
+        self.qr_text_label = QLabel("Scan to Download Your Photos!")
+        self.qr_text_label.setProperty("subtitle", True)
+        self.qr_text_label.setAlignment(Qt.AlignCenter)
+        self.qr_text_label.setStyleSheet(f"font-size: 24px; color: {FRAB8_GOLD}; margin-top: 10px;")
+        self.qr_text_label.hide()
+        
         # FPS info
         self.info_label = QLabel("FPS: --")
-        self.info_label.setStyleSheet("""
-            padding: 10px 15px;
-            background: rgba(255, 140, 0, 0.9);
-            color: white;
-            border-radius: 8px;
+        self.info_label.setStyleSheet(f"""
+            padding: 12px 18px;
+            background: rgba(212, 175, 55, 0.9);
+            color: {FRAB8_DARK_NAVY};
+            border-radius: 10px;
             font-weight: bold;
             font-size: 16px;
         """)
         
-        # Stack video and countdown
+        # Stack video and countdown in fixed container
         video_container = QWidget()
+        video_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
         video_layout = QVBoxLayout(video_container)
         video_layout.setContentsMargins(0, 0, 0, 0)
-        video_layout.addWidget(self.video_label)
-        video_layout.addWidget(self.countdown_label)
-        self.countdown_label.raise_()
+        
+        # Add video label to container
+        video_layout.addWidget(self.video_label, stretch=1, alignment=Qt.AlignCenter)
+        
+        # Overlay countdown and QR on top of video
+        self.countdown_label.setParent(self.video_label)
+        self.countdown_label.setGeometry(0, 0, self.video_label.width(), self.video_label.height())
+        
+        self.qr_container = QWidget(self.video_label)
+        qr_layout = QVBoxLayout(self.qr_container)
+        qr_layout.addWidget(self.qr_label, alignment=Qt.AlignCenter)
+        qr_layout.addWidget(self.qr_text_label, alignment=Qt.AlignCenter)
+        self.qr_container.hide()
         
         layout.addWidget(video_container, stretch=1)
-        layout.addWidget(self.info_label, alignment=Qt.AlignLeft)
+        
+        # Footer with FPS and instruction
+        footer_layout = QHBoxLayout()
+        footer_layout.addWidget(self.info_label)
+        footer_layout.addStretch()
+        
+        instruction = QLabel("Press ESC to exit fullscreen")
+        instruction.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 14px;")
+        footer_layout.addWidget(instruction)
+        
+        layout.addLayout(footer_layout)
         
         self.setLayout(layout)
+    
+    def resizeEvent(self, event):
+        """Handle window resize to reposition overlays"""
+        super().resizeEvent(event)
+        if hasattr(self, 'countdown_label'):
+            # Center countdown on video label
+            video_rect = self.video_label.geometry()
+            countdown_size = min(video_rect.width(), video_rect.height()) * 0.8
+            self.countdown_label.setGeometry(
+                int(video_rect.width() * 0.1),
+                int(video_rect.height() * 0.3),
+                int(video_rect.width() * 0.8),
+                int(video_rect.height() * 0.4)
+            )
+            
+        if hasattr(self, 'qr_container'):
+            # Center QR container
+            video_rect = self.video_label.geometry()
+            self.qr_container.setGeometry(
+                int(video_rect.width() * 0.2),
+                int(video_rect.height() * 0.2),
+                int(video_rect.width() * 0.6),
+                int(video_rect.height() * 0.6)
+            )
+    
+    def keyPressEvent(self, event):
+        """Handle ESC key to exit fullscreen"""
+        if event.key() == Qt.Key_Escape:
+            self.showNormal()
+        elif event.key() == Qt.Key_F11:
+            if self.isFullScreen():
+                self.showNormal()
+            else:
+                self.showFullScreen()
     
     def update_frame(self, qimg: QImage):
         """Update the video display"""
@@ -173,6 +356,8 @@ class DisplayWindow(QWidget):
     
     def show_countdown(self, value: int):
         """Show countdown number"""
+        self.qr_label.hide()
+        self.qr_text_label.hide()
         if value > 0:
             self.countdown_label.setText(str(value))
         else:
@@ -182,6 +367,38 @@ class DisplayWindow(QWidget):
     def hide_countdown(self):
         """Hide countdown overlay"""
         self.countdown_label.hide()
+    
+    def show_qr_code(self, qr_image=None):
+        """Display QR code for photo download"""
+        self.countdown_label.hide()
+        
+        if qr_image is not None:
+            # If QR code image is provided, display it
+            pixmap = QPixmap.fromImage(qr_image)
+            scaled = pixmap.scaled(400, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation)
+            self.qr_label.setPixmap(scaled)
+            self.qr_label.setFixedSize(400, 400)
+        else:
+            # Placeholder text if no QR library available
+            self.qr_label.setText("QR Code Here\n\n(QR library not available)")
+            self.qr_label.setFixedSize(400, 400)
+            self.qr_label.setStyleSheet(f"""
+                background: white;
+                border: 5px solid {FRAB8_GOLD};
+                border-radius: 15px;
+                padding: 60px;
+                font-size: 20px;
+                color: black;
+            """)
+        
+        self.qr_container.show()
+        
+        # Auto-hide after 10 seconds
+        QTimer.singleShot(10000, self.hide_qr_code)
+    
+    def hide_qr_code(self):
+        """Hide QR code display"""
+        self.qr_container.hide()
 
 
 # ============================================================
@@ -203,41 +420,52 @@ class ControlWindow(QWidget):
         self.bg_manager = bg_manager
         self.outline_manager = outline_manager
         
-        self.setWindowTitle("FIBOOTH - Controls")
-        self.setStyleSheet(ORANGE_WHITE_QSS)
+        self.setWindowTitle("FRAB8 Graduation PhotoBooth - Controls")
+        self.setStyleSheet(FRAB8_GRADUATION_QSS)
         
-        # Size and position
-        screen = QApplication.primaryScreen().availableGeometry()
-        self.resize(int(screen.width() * 0.35), int(screen.height() * 0.8))
+        # Make fullscreen
+        self.showFullScreen()
         
         self._init_ui()
     
+    def keyPressEvent(self, event):
+        """Handle ESC key to exit fullscreen"""
+        if event.key() == Qt.Key_Escape:
+            self.showNormal()
+        elif event.key() == Qt.Key_F11:
+            if self.isFullScreen():
+                self.showNormal()
+            else:
+                self.showFullScreen()
+    
     def _init_ui(self):
         main_layout = QVBoxLayout()
+        main_layout.setContentsMargins(30, 30, 30, 30)
+        main_layout.setSpacing(25)
         
         # Title
-        title = QLabel("FIBOOTH")
+        title = QLabel("🎓 FRAB8")
         title.setProperty("hero", True)
         title.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title)
         
-        subtitle = QLabel("KMUTT OPENHOUSE 2025")
+        subtitle = QLabel("GRADUATION PHOTOBOOTH 2025")
+        subtitle.setProperty("subtitle", True)
         subtitle.setAlignment(Qt.AlignCenter)
-        subtitle.setStyleSheet("font-size: 14px; color: #ff8c00; font-weight: 600;")
         main_layout.addWidget(subtitle)
-        main_layout.addSpacing(20)
         
-        # Capture button
-        self.capture_btn = QPushButton("📸 ถ่ายภาพ")
-        self.capture_btn.setFixedHeight(70)
-        self.capture_btn.setStyleSheet("""
-            font-size: 22px; font-weight: bold;
+        # Large capture button
+        self.capture_btn = QPushButton("📸 CAPTURE PHOTO")
+        self.capture_btn.setMinimumHeight(90)
+        self.capture_btn.setStyleSheet(f"""
+            font-size: 28px; 
+            font-weight: bold;
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 #ff8c00, stop:1 #ff6600);
-            color: white;
-            border: none;
-            border-radius: 15px;
-            padding: 10px 20px;
+                stop:0 {FRAB8_GOLD}, stop:1 {FRAB8_ACCENT});
+            color: {FRAB8_DARK_NAVY};
+            border: 4px solid {FRAB8_GOLD};
+            border-radius: 20px;
+            padding: 20px;
         """)
         self.capture_btn.clicked.connect(self.capture_requested.emit)
         main_layout.addWidget(self.capture_btn)
@@ -250,34 +478,46 @@ class ControlWindow(QWidget):
         
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
+        content_layout.setSpacing(25)
         
         # Add all control sections
         content_layout.addLayout(self._create_background_section())
-        content_layout.addSpacing(20)
         content_layout.addLayout(self._create_outline_section())
-        content_layout.addSpacing(20)
         content_layout.addLayout(self._create_props_section())
-        content_layout.addSpacing(20)
-        content_layout.addLayout(self._create_frame_section())
         content_layout.addStretch()
         
         scroll.setWidget(content_widget)
-        main_layout.addWidget(scroll)
+        main_layout.addWidget(scroll, stretch=1)
+        
+        # Footer
+        footer = QLabel("Press ESC to exit fullscreen | F11 to toggle")
+        footer.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 12px; padding: 10px;")
+        footer.setAlignment(Qt.AlignCenter)
+        main_layout.addWidget(footer)
         
         self.setLayout(main_layout)
     
     def _create_background_section(self):
         section = QVBoxLayout()
+        section.setSpacing(15)
         
-        title = QLabel("🖼 Background")
+        title = QLabel("🖼️ BACKGROUNDS")
         title.setProperty("section", True)
         title.setAlignment(Qt.AlignCenter)
         section.addWidget(title)
         
+        # Video background note
+        note = QLabel("💡 Tip: Video backgrounds supported!")
+        note.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 13px; padding: 8px;")
+        note.setAlignment(Qt.AlignCenter)
+        section.addWidget(note)
+        
         grid = QGridLayout()
-        grid.setSpacing(S(10))
+        grid.setSpacing(15)
+        grid.setContentsMargins(10, 10, 10, 10)
         
         thumbnails = self.bg_manager.load_thumbnails(limit=60)
+        cols = 3
         for i, (path, pixmap) in enumerate(thumbnails):
             btn = QPushButton()
             btn.setIcon(QIcon(pixmap))
@@ -285,33 +525,37 @@ class ControlWindow(QWidget):
             btn.setFixedSize(*BUTTON_SIZE)
             btn.setToolTip(path)
             btn.clicked.connect(lambda checked=False, p=path: self._on_bg_select(p))
-            grid.addWidget(btn, i // 3, i % 3)
+            grid.addWidget(btn, i // cols, i % cols)
         
         section.addLayout(grid)
         return section
     
     def _create_outline_section(self):
         section = QVBoxLayout()
+        section.setSpacing(15)
         
-        title = QLabel("✒️ Stroke")
+        title = QLabel("✏️ OUTLINE STYLE")
         title.setProperty("section", True)
         title.setAlignment(Qt.AlignCenter)
         section.addWidget(title)
         
         # Stroke toggle
-        self.stroke_btn = QPushButton("Stroke: ON")
+        self.stroke_btn = QPushButton("Outline: ON")
         self.stroke_btn.setCheckable(True)
         self.stroke_btn.setChecked(True)
+        self.stroke_btn.setMinimumHeight(50)
+        self.stroke_btn.setStyleSheet(f"font-size: 16px;")
         self.stroke_btn.clicked.connect(self._toggle_stroke)
         section.addWidget(self.stroke_btn)
-        section.addWidget(self._make_line())
         
         # Color picker
-        color_label = QLabel("Color")
+        color_label = QLabel("Outline Color")
         color_label.setAlignment(Qt.AlignCenter)
+        color_label.setStyleSheet(f"font-size: 15px; color: {FRAB8_LIGHT_GOLD}; margin-top: 10px;")
         section.addWidget(color_label)
         
         self.color_btn = QPushButton()
+        self.color_btn.setMinimumHeight(60)
         self._update_color_btn()
         self.color_btn.clicked.connect(self._open_color_picker)
         section.addWidget(self.color_btn)
@@ -320,83 +564,50 @@ class ControlWindow(QWidget):
     
     def _create_props_section(self):
         section = QVBoxLayout()
+        section.setSpacing(15)
         
-        title = QLabel("🎭 Virtual Props")
+        title = QLabel("🎭 VIRTUAL PROPS")
         title.setProperty("section", True)
         title.setAlignment(Qt.AlignCenter)
         section.addWidget(title)
         
         grid = QGridLayout()
-        grid.setSpacing(S(10))
+        grid.setSpacing(15)
+        grid.setContentsMargins(10, 10, 10, 10)
         
-        # Props buttons
+        # Props buttons with larger size
+        btn_width, btn_height = 180, 80
+        
         self.glasses_btn = QPushButton("👓 Glasses")
         self.glasses_btn.setCheckable(True)
-        self.glasses_btn.setFixedSize(S(120), S(60))
+        self.glasses_btn.setFixedSize(btn_width, btn_height)
+        self.glasses_btn.setStyleSheet("font-size: 16px;")
         self.glasses_btn.clicked.connect(lambda: self.prop_toggled.emit("glasses", self.glasses_btn.isChecked()))
         grid.addWidget(self.glasses_btn, 0, 0)
         
-        self.hat_btn = QPushButton("🎩 Hat")
+        self.hat_btn = QPushButton("🎓 Grad Cap")
         self.hat_btn.setCheckable(True)
-        self.hat_btn.setFixedSize(S(120), S(60))
+        self.hat_btn.setFixedSize(btn_width, btn_height)
+        self.hat_btn.setStyleSheet("font-size: 16px;")
         self.hat_btn.clicked.connect(lambda: self.prop_toggled.emit("hat", self.hat_btn.isChecked()))
         grid.addWidget(self.hat_btn, 0, 1)
         
         self.mustache_btn = QPushButton("🥸 Mustache")
         self.mustache_btn.setCheckable(True)
-        self.mustache_btn.setFixedSize(S(120), S(60))
+        self.mustache_btn.setFixedSize(btn_width, btn_height)
+        self.mustache_btn.setStyleSheet("font-size: 16px;")
         self.mustache_btn.clicked.connect(lambda: self.prop_toggled.emit("mustache", self.mustache_btn.isChecked()))
         grid.addWidget(self.mustache_btn, 1, 0)
         
-        self.logo_btn = QPushButton("🏢 Logo")
+        self.logo_btn = QPushButton("🏫 School Logo")
         self.logo_btn.setCheckable(True)
         self.logo_btn.setChecked(True)
-        self.logo_btn.setFixedSize(S(120), S(60))
+        self.logo_btn.setFixedSize(btn_width, btn_height)
+        self.logo_btn.setStyleSheet("font-size: 16px;")
         self.logo_btn.clicked.connect(lambda: self.prop_toggled.emit("logo", self.logo_btn.isChecked()))
         grid.addWidget(self.logo_btn, 1, 1)
         
         section.addLayout(grid)
-        return section
-    
-    def _create_frame_section(self):
-        section = QVBoxLayout()
-        
-        title = QLabel("🖼️ Frame Style")
-        title.setProperty("section", True)
-        title.setAlignment(Qt.AlignCenter)
-        section.addWidget(title)
-        
-        # Frame preview
-        self.frame_preview = QLabel()
-        self.frame_preview.setAlignment(Qt.AlignCenter)
-        self.frame_preview.setFixedSize(S(250), S(375))
-        self.frame_preview.setStyleSheet("""
-            border: 3px solid #ff8c00;
-            border-radius: 8px;
-            background-color: #fff;
-        """)
-        section.addWidget(self.frame_preview, alignment=Qt.AlignCenter)
-        
-        # Frame selection buttons
-        grid = QGridLayout()
-        grid.setSpacing(S(10))
-        
-        self.frame_gradient_btn = QPushButton("Gradient")
-        self.frame_gradient_btn.setCheckable(True)
-        self.frame_gradient_btn.setChecked(True)
-        self.frame_gradient_btn.setFixedSize(S(120), S(60))
-        self.frame_gradient_btn.clicked.connect(lambda: self._select_frame("fibooth_gradient"))
-        grid.addWidget(self.frame_gradient_btn, 0, 0)
-        
-        self.frame_bold_btn = QPushButton("Bold")
-        self.frame_bold_btn.setCheckable(True)
-        self.frame_bold_btn.setFixedSize(S(120), S(60))
-        self.frame_bold_btn.clicked.connect(lambda: self._select_frame("fibooth_bold"))
-        grid.addWidget(self.frame_bold_btn, 0, 1)
-        
-        section.addLayout(grid)
-        self._update_frame_preview("fibooth_gradient")
-        
         return section
     
     def _make_line(self):
@@ -410,10 +621,10 @@ class ControlWindow(QWidget):
     
     def _toggle_stroke(self):
         if self.stroke_btn.isChecked():
-            self.stroke_btn.setText("Stroke: ON")
+            self.stroke_btn.setText("Outline: ON")
             self.outline_style_changed.emit("Solid")
         else:
-            self.stroke_btn.setText("Stroke: OFF")
+            self.stroke_btn.setText("Outline: OFF")
             self.outline_style_changed.emit("None")
     
     def _open_color_picker(self):
@@ -429,42 +640,19 @@ class ControlWindow(QWidget):
         c = self.outline_manager.current_color
         self.color_btn.setStyleSheet(
             f"background-color: rgb({c[2]}, {c[1]}, {c[0]}); "
-            f"min-width: {S(80)}px; min-height: {S(40)}px;"
+            f"border: 3px solid {FRAB8_GOLD}; "
+            f"border-radius: 12px; "
+            f"min-height: 60px;"
         )
         self.color_btn.setText("")
-    
-    def _select_frame(self, frame_name: str):
-        self.frame_gradient_btn.setChecked(frame_name == "fibooth_gradient")
-        self.frame_bold_btn.setChecked(frame_name == "fibooth_bold")
-        self._update_frame_preview(frame_name)
-        self.frame_selected.emit(frame_name)
-    
-    def _update_frame_preview(self, frame_name: str):
-        frame_files = {
-            "fibooth_gradient": "frame_fibooth_gradient.png",
-            "fibooth_bold": "frame_fibooth_bold.png"
-        }
-        frame_file = frame_files.get(frame_name, "frame_fibooth_gradient.png")
-        frame_path = PROJECT_ROOT / "resources" / "frames" / frame_file
-        
-        if frame_path.exists():
-            pixmap = QPixmap(str(frame_path))
-            scaled_pixmap = pixmap.scaled(
-                self.frame_preview.size(),
-                Qt.KeepAspectRatio,
-                Qt.SmoothTransformation
-            )
-            self.frame_preview.setPixmap(scaled_pixmap)
-        else:
-            self.frame_preview.setText("No Preview")
     
     def set_capture_enabled(self, enabled: bool):
         """Enable/disable capture button"""
         self.capture_btn.setEnabled(enabled)
         if enabled:
-            self.capture_btn.setText("📸 ถ่ายภาพ")
+            self.capture_btn.setText("📸 CAPTURE PHOTO")
         else:
-            self.capture_btn.setText("⏳ กำลังถ่าย...")
+            self.capture_btn.setText("⏳ Processing...")
 
 
 # ============================================================
@@ -475,6 +663,7 @@ class PhotoBoothApp(QWidget):
     
     def __init__(self, camera_index: int = CAMERA_INDEX):
         super().__init__()
+        
         # Core managers
         self.segment = create_segment()
         self.bg_manager = BackgroundManager(BG_ROOT)
@@ -486,8 +675,8 @@ class PhotoBoothApp(QWidget):
         self.photobooth_mode = False
         self.captured_images = []
         self.countdown_value = 0
-        self.current_frame_config = "fibooth_gradient"
         self.latest_processed_frame = None
+        self.latest_photo_path = None
         
         # Create windows
         self.display_window = DisplayWindow()
@@ -498,7 +687,6 @@ class PhotoBoothApp(QWidget):
         self.control_window.outline_style_changed.connect(self._set_outline_style)
         self.control_window.outline_color_changed.connect(self._set_outline_color)
         self.control_window.prop_toggled.connect(self._toggle_prop)
-        self.control_window.frame_selected.connect(self._select_frame)
         
         # Countdown timer
         self.countdown_timer = QTimer()
@@ -525,7 +713,7 @@ class PhotoBoothApp(QWidget):
         self.processor.processed_ready.connect(self._display_qimage, Qt.QueuedConnection)
         self.processor.fps_ready.connect(self._update_fps, Qt.QueuedConnection)
         
-        # Position windows side by side
+        # Position windows on different screens if available
         self._position_windows()
         
         # Start threads
@@ -533,20 +721,54 @@ class PhotoBoothApp(QWidget):
         self.processor.start()
     
     def _position_windows(self):
-        """Position windows side by side"""
-        screen = QApplication.primaryScreen().availableGeometry()
+        """Position windows on different screens - Control on Monitor 1, Display on Monitor 2"""
+        desktop = QApplication.desktop()
+        screens = QApplication.screens()
         
-        # Control window on left
-        self.control_window.move(screen.left(), screen.top())
+        print(f"[INFO] Available monitors: {len(screens)}")
         
-        # Display window on right
-        control_right = self.control_window.x() + self.control_window.width()
-        self.display_window.move(control_right + 10, screen.top())
+        if len(screens) >= 2:
+            # Monitor 1 (Primary) - Control Window
+            screen1_geometry = screens[0].geometry()
+            print(f"[INFO] Monitor 1 (Control): {screen1_geometry.width()}x{screen1_geometry.height()} at ({screen1_geometry.x()}, {screen1_geometry.y()})")
+            
+            # Monitor 2 (Secondary) - Display Window
+            screen2_geometry = screens[1].geometry()
+            print(f"[INFO] Monitor 2 (Display): {screen2_geometry.width()}x{screen2_geometry.height()} at ({screen2_geometry.x()}, {screen2_geometry.y()})")
+            
+            # Move control window to monitor 1
+            self.control_window.move(screen1_geometry.x(), screen1_geometry.y())
+            self.control_window.resize(screen1_geometry.width(), screen1_geometry.height())
+            
+            # Move display window to monitor 2
+            self.display_window.move(screen2_geometry.x(), screen2_geometry.y())
+            self.display_window.resize(screen2_geometry.width(), screen2_geometry.height())
+            
+            print("[INFO] Windows positioned on separate monitors")
+        else:
+            # Single screen fallback - show side by side
+            print("[INFO] Only one monitor detected - using split screen mode")
+            screen = screens[0].geometry()
+            half_width = screen.width() // 2
+            
+            # Control on left half
+            self.control_window.move(screen.x(), screen.y())
+            self.control_window.resize(half_width, screen.height())
+            
+            # Display on right half
+            self.display_window.move(screen.x() + half_width, screen.y())
+            self.display_window.resize(half_width, screen.height())
     
     def show(self):
-        """Show both windows"""
-        self.control_window.show()
-        self.display_window.show()
+        """Show both windows on separate monitors"""
+        # Position first, then show
+        self._position_windows()
+        
+        # Show windows
+        self.control_window.showFullScreen()
+        self.display_window.showFullScreen()
+        
+        print("[INFO] Both windows displayed")
     
     @pyqtSlot(np.ndarray)
     def _on_camera_frame(self, frame: np.ndarray):
@@ -588,10 +810,6 @@ class PhotoBoothApp(QWidget):
         self.processor.props_enabled[prop_name] = enabled
         print(f"{prop_name.capitalize()}: {'ON' if enabled else 'OFF'}")
     
-    def _select_frame(self, frame_name: str):
-        self.current_frame_config = frame_name
-        print(f"Frame style: {frame_name}")
-    
     def _capture_single_photo(self):
         if self.photobooth_mode:
             return
@@ -619,8 +837,8 @@ class PhotoBoothApp(QWidget):
         if self.latest_processed_frame is None:
             QMessageBox.warning(
                 self.control_window,
-                "ข้อผิดพลาด",
-                "ไม่สามารถถ่ายภาพได้"
+                "Error",
+                "Unable to capture photo"
             )
             self._reset_photobooth_mode()
             return
@@ -628,53 +846,70 @@ class PhotoBoothApp(QWidget):
         self.captured_images.append(self.latest_processed_frame.copy())
         print(f"[Photobooth] Captured image {len(self.captured_images)}")
         
-        if len(self.captured_images) >= 3:
-            self._create_photobooth_strip()
-        else:
-            out_dir = PROJECT_ROOT / "resources" / "output_images"
-            out_dir.mkdir(exist_ok=True)
-            now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-            out_path = out_dir / f"photo_{now}.png"
-            
-            print(f"[Photobooth] Saved photo: {out_path}")
-            QMessageBox.information(
-                self.control_window,
-                "สำเร็จ! 🎉",
-                f"บันทึกรูปภาพแล้ว:\n{out_path}\n\n"
-                f"รูปที่ {len(self.captured_images)}/3 สำหรับ Photobooth Strip"
-            )
+        # Save individual photo
+        out_dir = PROJECT_ROOT / "resources" / "output_images"
+        out_dir.mkdir(exist_ok=True)
+        now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        out_path = out_dir / f"FRAB8_Grad_{now}.png"
+        cv2.imwrite(str(out_path), self.latest_processed_frame)
+        
+        self.latest_photo_path = str(out_path)
+        print(f"[Photobooth] Saved photo: {out_path}")
     
     def _finish_capture(self):
         self.countdown_timer.stop()
         self.display_window.hide_countdown()
+        
+        # Generate and show QR code
+        self._generate_qr_code()
+        
         self._reset_photobooth_mode()
     
-    def _create_photobooth_strip(self):
-        from datetime import datetime
-        from PyQt5.QtWidgets import QMessageBox
-        
-        if len(self.captured_images) < 3:
-            return
-        
-        strip = create_photobooth_frame(
-            self.captured_images[-3:],
-            self.current_frame_config
-        )
-        
-        out_dir = PROJECT_ROOT / "output_images"
-        out_dir.mkdir(exist_ok=True)
-        now = datetime.now().strftime("%Y%m%d_%H%M%S")
-        out_path = out_dir / f"photobooth_strip_{now}.png"
-        cv2.imwrite(str(out_path), strip)
-        
-        print(f"[Photobooth] Saved strip: {out_path}")
-        QMessageBox.information(
-            self.control_window,
-            "สำเร็จ! 🎉 Photobooth Strip",
-            f"บันทึก Photobooth Strip แล้ว:\n{out_path}\n\n"
-            "ถ่ายรูปใหม่ต่อได้เลย!"
-        )
-        self.captured_images = []
+    def _generate_qr_code(self):
+        """Generate QR code for photo download"""
+        try:
+            # Try to import qrcode library
+            import qrcode
+            from io import BytesIO
+            
+            if self.latest_photo_path:
+                # Create URL or path for photo download
+                # You can replace this with your actual server URL
+                download_url = f"http://yourserver.com/download/{Path(self.latest_photo_path).name}"
+                
+                # Generate QR code
+                qr = qrcode.QRCode(
+                    version=1,
+                    error_correction=qrcode.constants.ERROR_CORRECT_L,
+                    box_size=10,
+                    border=4,
+                )
+                qr.add_data(download_url)
+                qr.make(fit=True)
+                
+                # Create QR code image
+                qr_img = qr.make_image(fill_color="black", back_color="white")
+                
+                # Convert PIL image to QImage
+                buffer = BytesIO()
+                qr_img.save(buffer, format='PNG')
+                buffer.seek(0)
+                
+                qimage = QImage()
+                qimage.loadFromData(buffer.read())
+                
+                self.display_window.show_qr_code(qimage)
+            else:
+                # Show placeholder if no photo path
+                self.display_window.show_qr_code(None)
+                
+        except ImportError:
+            print("[INFO] qrcode library not installed. Install with: pip install qrcode[pil]")
+            # Show placeholder QR code
+            self.display_window.show_qr_code(None)
+        except Exception as e:
+            print(f"[ERROR] Failed to generate QR code: {e}")
+            self.display_window.show_qr_code(None)
     
     def _reset_photobooth_mode(self):
         self.photobooth_mode = False
@@ -697,6 +932,10 @@ class PhotoBoothApp(QWidget):
 def main():
     import sys
     app = QApplication(sys.argv)
+    
+    # Set application-wide font
+    font = QFont("Segoe UI", 10)
+    app.setFont(font)
     
     photobooth = PhotoBoothApp(camera_index=CAMERA_INDEX)
     photobooth.show()
