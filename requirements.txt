@@ -1,0 +1,14 @@
+# --- core pins that keep Mediapipe happy on Windows ---
+mediapipe==0.10.14
+opencv-contrib-python==4.8.1.78
+numpy==1.26.4
+protobuf<5
+flatbuffers==23.5.26
+absl-py>=1.4.0
+
+# --- your other deps (these are OK) ---
+albumentations==2.0.8
+iglovikov_helper_functions==0.0.53
+people_segmentation==0.0.4
+PyQt5==5.15.11
+PyQt5_sip==12.17.0
