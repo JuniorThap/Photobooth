@@ -89,14 +89,14 @@ QLabel[hero="true"] {{
 }}
 
 QLabel[section="true"] {{
-    font-size: 20px;
+    font-size: 22px;
     font-weight: bold;
     color: {FRAB8_GOLD};
-    padding: 12px;
+    padding: 15px;
     background: {FRAB8_DARK_NAVY};
-    border: 2px solid {FRAB8_GOLD};
-    border-radius: 8px;
-    margin: 8px 0;
+    border: 3px solid {FRAB8_GOLD};
+    border-radius: 10px;
+    margin: 5px 0;
 }}
 
 QLabel[subtitle="true"] {{
@@ -210,8 +210,8 @@ class DisplayWindow(QWidget):
         self.setWindowTitle("FRAB8 Graduation PhotoBooth - Display")
         self.setStyleSheet(FRAB8_GRADUATION_QSS)
         
-        # Make fullscreen
-        self.showFullScreen()
+        # Normal window with standard controls (movable, closable)
+        # Remove fullscreen, make it a normal window
         
         # Main layout
         layout = QVBoxLayout()
@@ -297,12 +297,27 @@ class DisplayWindow(QWidget):
         
         layout.addWidget(video_container, stretch=1)
         
+        # Large capture button at bottom
+        self.capture_btn = QPushButton("📸 CAPTURE PHOTO")
+        self.capture_btn.setMinimumHeight(100)
+        self.capture_btn.setStyleSheet(f"""
+            font-size: 32px; 
+            font-weight: bold;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 {FRAB8_GOLD}, stop:1 {FRAB8_ACCENT});
+            color: {FRAB8_DARK_NAVY};
+            border: 5px solid {FRAB8_GOLD};
+            border-radius: 25px;
+            padding: 20px;
+        """)
+        layout.addWidget(self.capture_btn)
+        
         # Footer with FPS and instruction
         footer_layout = QHBoxLayout()
         footer_layout.addWidget(self.info_label)
         footer_layout.addStretch()
         
-        instruction = QLabel("Press ESC to exit fullscreen")
+        instruction = QLabel("Drag to move | Close with X button")
         instruction.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 14px;")
         footer_layout.addWidget(instruction)
         
@@ -335,14 +350,16 @@ class DisplayWindow(QWidget):
             )
     
     def keyPressEvent(self, event):
-        """Handle ESC key to exit fullscreen"""
-        if event.key() == Qt.Key_Escape:
-            self.showNormal()
-        elif event.key() == Qt.Key_F11:
+        """Handle keyboard shortcuts"""
+        if event.key() == Qt.Key_F11:
+            # Allow F11 to toggle fullscreen
             if self.isFullScreen():
                 self.showNormal()
             else:
                 self.showFullScreen()
+        elif event.key() == Qt.Key_Escape and self.isFullScreen():
+            # ESC exits fullscreen only if in fullscreen mode
+            self.showNormal()
     
     def update_frame(self, qimg: QImage):
         """Update the video display"""
@@ -423,27 +440,29 @@ class ControlWindow(QWidget):
         self.setWindowTitle("FRAB8 Graduation PhotoBooth - Controls")
         self.setStyleSheet(FRAB8_GRADUATION_QSS)
         
-        # Make fullscreen
-        self.showFullScreen()
+        # Normal window with standard controls (movable, closable)
+        # Remove fullscreen
         
         self._init_ui()
     
     def keyPressEvent(self, event):
-        """Handle ESC key to exit fullscreen"""
-        if event.key() == Qt.Key_Escape:
-            self.showNormal()
-        elif event.key() == Qt.Key_F11:
+        """Handle keyboard shortcuts"""
+        if event.key() == Qt.Key_F11:
+            # Allow F11 to toggle fullscreen
             if self.isFullScreen():
                 self.showNormal()
             else:
                 self.showFullScreen()
+        elif event.key() == Qt.Key_Escape and self.isFullScreen():
+            # ESC exits fullscreen only if in fullscreen mode
+            self.showNormal()
     
     def _init_ui(self):
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(30, 30, 30, 30)
-        main_layout.setSpacing(25)
+        main_layout.setContentsMargins(40, 40, 40, 40)
+        main_layout.setSpacing(20)
         
-        # Title
+        # Title section
         title = QLabel("🎓 FRAB8")
         title.setProperty("hero", True)
         title.setAlignment(Qt.AlignCenter)
@@ -454,36 +473,28 @@ class ControlWindow(QWidget):
         subtitle.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(subtitle)
         
-        # Large capture button
-        self.capture_btn = QPushButton("📸 CAPTURE PHOTO")
-        self.capture_btn.setMinimumHeight(90)
-        self.capture_btn.setStyleSheet(f"""
-            font-size: 28px; 
-            font-weight: bold;
-            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 {FRAB8_GOLD}, stop:1 {FRAB8_ACCENT});
-            color: {FRAB8_DARK_NAVY};
-            border: 4px solid {FRAB8_GOLD};
-            border-radius: 20px;
-            padding: 20px;
-        """)
-        self.capture_btn.clicked.connect(self.capture_requested.emit)
-        main_layout.addWidget(self.capture_btn)
         main_layout.addWidget(self._make_line())
+        main_layout.addSpacing(10)
         
         # Create scrollable content area
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         
         content_widget = QWidget()
         content_layout = QVBoxLayout(content_widget)
-        content_layout.setSpacing(25)
+        content_layout.setSpacing(30)
+        content_layout.setContentsMargins(10, 10, 10, 10)
         
-        # Add all control sections
-        content_layout.addLayout(self._create_background_section())
-        content_layout.addLayout(self._create_outline_section())
+        # Add all control sections with clear separation
         content_layout.addLayout(self._create_props_section())
+        content_layout.addWidget(self._make_separator())
+        
+        content_layout.addLayout(self._create_outline_section())
+        content_layout.addWidget(self._make_separator())
+        
+        content_layout.addLayout(self._create_background_section())
         content_layout.addStretch()
         
         scroll.setWidget(content_widget)
@@ -491,11 +502,18 @@ class ControlWindow(QWidget):
         
         # Footer
         footer = QLabel("Press ESC to exit fullscreen | F11 to toggle")
-        footer.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 12px; padding: 10px;")
+        footer.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 14px; padding: 15px;")
         footer.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(footer)
         
         self.setLayout(main_layout)
+    
+    def _make_separator(self):
+        """Create a visual separator between sections"""
+        separator = QFrame()
+        separator.setFrameShape(QFrame.HLine)
+        separator.setStyleSheet(f"background-color: {FRAB8_GOLD}; max-height: 3px; margin: 15px 0;")
+        return separator
     
     def _create_background_section(self):
         section = QVBoxLayout()
@@ -507,27 +525,29 @@ class ControlWindow(QWidget):
         section.addWidget(title)
         
         # Video background note
-        note = QLabel("💡 Tip: Video backgrounds supported!")
-        note.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 13px; padding: 8px;")
+        note = QLabel("💡 Video backgrounds supported")
+        note.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 14px; padding: 8px;")
         note.setAlignment(Qt.AlignCenter)
         section.addWidget(note)
         
+        # Background grid (no scroll area)
         grid = QGridLayout()
-        grid.setSpacing(15)
-        grid.setContentsMargins(10, 10, 10, 10)
+        grid.setSpacing(20)
+        grid.setContentsMargins(20, 20, 20, 20)
         
         thumbnails = self.bg_manager.load_thumbnails(limit=60)
-        cols = 3
+        cols = 2
         for i, (path, pixmap) in enumerate(thumbnails):
             btn = QPushButton()
             btn.setIcon(QIcon(pixmap))
-            btn.setIconSize(THUMBNAIL_SIZE)
-            btn.setFixedSize(*BUTTON_SIZE)
-            btn.setToolTip(path)
+            btn.setIconSize(QSize(200, 133))
+            btn.setFixedSize(220, 150)
+            btn.setToolTip(Path(path).name)
             btn.clicked.connect(lambda checked=False, p=path: self._on_bg_select(p))
             grid.addWidget(btn, i // cols, i % cols)
         
         section.addLayout(grid)
+        
         return section
     
     def _create_outline_section(self):
@@ -539,27 +559,38 @@ class ControlWindow(QWidget):
         title.setAlignment(Qt.AlignCenter)
         section.addWidget(title)
         
+        controls = QHBoxLayout()
+        controls.setSpacing(20)
+        controls.setContentsMargins(20, 20, 20, 20)
+        
         # Stroke toggle
         self.stroke_btn = QPushButton("Outline: ON")
         self.stroke_btn.setCheckable(True)
         self.stroke_btn.setChecked(True)
-        self.stroke_btn.setMinimumHeight(50)
-        self.stroke_btn.setStyleSheet(f"font-size: 16px;")
+        self.stroke_btn.setMinimumHeight(60)
+        self.stroke_btn.setMinimumWidth(200)
+        self.stroke_btn.setStyleSheet(f"font-size: 18px;")
         self.stroke_btn.clicked.connect(self._toggle_stroke)
-        section.addWidget(self.stroke_btn)
+        controls.addWidget(self.stroke_btn)
         
         # Color picker
-        color_label = QLabel("Outline Color")
+        color_widget = QVBoxLayout()
+        color_label = QLabel("Color")
         color_label.setAlignment(Qt.AlignCenter)
-        color_label.setStyleSheet(f"font-size: 15px; color: {FRAB8_LIGHT_GOLD}; margin-top: 10px;")
-        section.addWidget(color_label)
+        color_label.setStyleSheet(f"font-size: 16px; color: {FRAB8_LIGHT_GOLD}; margin-bottom: 5px;")
+        color_widget.addWidget(color_label)
         
         self.color_btn = QPushButton()
         self.color_btn.setMinimumHeight(60)
+        self.color_btn.setMinimumWidth(200)
         self._update_color_btn()
         self.color_btn.clicked.connect(self._open_color_picker)
-        section.addWidget(self.color_btn)
+        color_widget.addWidget(self.color_btn)
         
+        controls.addLayout(color_widget)
+        controls.addStretch()
+        
+        section.addLayout(controls)
         return section
     
     def _create_props_section(self):
@@ -572,41 +603,42 @@ class ControlWindow(QWidget):
         section.addWidget(title)
         
         grid = QGridLayout()
-        grid.setSpacing(15)
-        grid.setContentsMargins(10, 10, 10, 10)
+        grid.setSpacing(20)
+        grid.setContentsMargins(20, 20, 20, 20)
         
-        # Props buttons with larger size
-        btn_width, btn_height = 180, 80
+        # Props buttons with consistent size
+        btn_width, btn_height = 220, 90
         
-        self.glasses_btn = QPushButton("👓 Glasses")
+        self.glasses_btn = QPushButton("👓\nGlasses")
         self.glasses_btn.setCheckable(True)
         self.glasses_btn.setFixedSize(btn_width, btn_height)
-        self.glasses_btn.setStyleSheet("font-size: 16px;")
+        self.glasses_btn.setStyleSheet("font-size: 18px; line-height: 1.5;")
         self.glasses_btn.clicked.connect(lambda: self.prop_toggled.emit("glasses", self.glasses_btn.isChecked()))
         grid.addWidget(self.glasses_btn, 0, 0)
         
-        self.hat_btn = QPushButton("🎓 Grad Cap")
+        self.hat_btn = QPushButton("🎓\nGrad Cap")
         self.hat_btn.setCheckable(True)
         self.hat_btn.setFixedSize(btn_width, btn_height)
-        self.hat_btn.setStyleSheet("font-size: 16px;")
+        self.hat_btn.setStyleSheet("font-size: 18px; line-height: 1.5;")
         self.hat_btn.clicked.connect(lambda: self.prop_toggled.emit("hat", self.hat_btn.isChecked()))
         grid.addWidget(self.hat_btn, 0, 1)
         
-        self.mustache_btn = QPushButton("🥸 Mustache")
+        self.mustache_btn = QPushButton("🥸\nMustache")
         self.mustache_btn.setCheckable(True)
         self.mustache_btn.setFixedSize(btn_width, btn_height)
-        self.mustache_btn.setStyleSheet("font-size: 16px;")
+        self.mustache_btn.setStyleSheet("font-size: 18px; line-height: 1.5;")
         self.mustache_btn.clicked.connect(lambda: self.prop_toggled.emit("mustache", self.mustache_btn.isChecked()))
         grid.addWidget(self.mustache_btn, 1, 0)
         
-        self.logo_btn = QPushButton("🏫 School Logo")
+        self.logo_btn = QPushButton("🏫\nSchool Logo")
         self.logo_btn.setCheckable(True)
         self.logo_btn.setChecked(True)
         self.logo_btn.setFixedSize(btn_width, btn_height)
-        self.logo_btn.setStyleSheet("font-size: 16px;")
+        self.logo_btn.setStyleSheet("font-size: 18px; line-height: 1.5;")
         self.logo_btn.clicked.connect(lambda: self.prop_toggled.emit("logo", self.logo_btn.isChecked()))
         grid.addWidget(self.logo_btn, 1, 1)
         
+        grid.setAlignment(Qt.AlignCenter)
         section.addLayout(grid)
         return section
     
@@ -682,8 +714,11 @@ class PhotoBoothApp(QWidget):
         self.display_window = DisplayWindow()
         self.control_window = ControlWindow(self.bg_manager, self.outline_manager)
         
+        # Connect capture button from display window
+        self.display_window.capture_btn.clicked.connect(self._capture_single_photo)
+        
         # Connect control signals
-        self.control_window.capture_requested.connect(self._capture_single_photo)
+        self.control_window.capture_requested.connect(self._capture_single_photo)  # Keep for compatibility
         self.control_window.outline_style_changed.connect(self._set_outline_style)
         self.control_window.outline_color_changed.connect(self._set_outline_color)
         self.control_window.prop_toggled.connect(self._toggle_prop)
@@ -729,44 +764,59 @@ class PhotoBoothApp(QWidget):
         
         if len(screens) >= 2:
             # Monitor 1 (Primary) - Control Window
-            screen1_geometry = screens[0].geometry()
+            screen1_geometry = screens[0].availableGeometry()
             print(f"[INFO] Monitor 1 (Control): {screen1_geometry.width()}x{screen1_geometry.height()} at ({screen1_geometry.x()}, {screen1_geometry.y()})")
             
             # Monitor 2 (Secondary) - Display Window
-            screen2_geometry = screens[1].geometry()
+            screen2_geometry = screens[1].availableGeometry()
             print(f"[INFO] Monitor 2 (Display): {screen2_geometry.width()}x{screen2_geometry.height()} at ({screen2_geometry.x()}, {screen2_geometry.y()})")
             
-            # Move control window to monitor 1
-            self.control_window.move(screen1_geometry.x(), screen1_geometry.y())
-            self.control_window.resize(screen1_geometry.width(), screen1_geometry.height())
+            # Size windows to fit available geometry (accounting for taskbar)
+            self.control_window.setGeometry(
+                screen1_geometry.x(),
+                screen1_geometry.y(),
+                screen1_geometry.width(),
+                screen1_geometry.height()
+            )
             
-            # Move display window to monitor 2
-            self.display_window.move(screen2_geometry.x(), screen2_geometry.y())
-            self.display_window.resize(screen2_geometry.width(), screen2_geometry.height())
+            self.display_window.setGeometry(
+                screen2_geometry.x(),
+                screen2_geometry.y(),
+                screen2_geometry.width(),
+                screen2_geometry.height()
+            )
             
             print("[INFO] Windows positioned on separate monitors")
         else:
             # Single screen fallback - show side by side
             print("[INFO] Only one monitor detected - using split screen mode")
-            screen = screens[0].geometry()
+            screen = screens[0].availableGeometry()
             half_width = screen.width() // 2
             
             # Control on left half
-            self.control_window.move(screen.x(), screen.y())
-            self.control_window.resize(half_width, screen.height())
+            self.control_window.setGeometry(
+                screen.x(),
+                screen.y(),
+                half_width,
+                screen.height()
+            )
             
             # Display on right half
-            self.display_window.move(screen.x() + half_width, screen.y())
-            self.display_window.resize(half_width, screen.height())
+            self.display_window.setGeometry(
+                screen.x() + half_width,
+                screen.y(),
+                half_width,
+                screen.height()
+            )
     
     def show(self):
         """Show both windows on separate monitors"""
         # Position first, then show
         self._position_windows()
         
-        # Show windows
-        self.control_window.showFullScreen()
-        self.display_window.showFullScreen()
+        # Show windows normally (not fullscreen by default)
+        self.control_window.show()
+        self.display_window.show()
         
         print("[INFO] Both windows displayed")
     
@@ -815,7 +865,7 @@ class PhotoBoothApp(QWidget):
             return
         
         self.photobooth_mode = True
-        self.control_window.set_capture_enabled(False)
+        self.display_window.set_capture_enabled(False)
         
         self.countdown_value = 3
         self.display_window.show_countdown(self.countdown_value)
@@ -913,7 +963,7 @@ class PhotoBoothApp(QWidget):
     
     def _reset_photobooth_mode(self):
         self.photobooth_mode = False
-        self.control_window.set_capture_enabled(True)
+        self.display_window.set_capture_enabled(True)
     
     def cleanup(self):
         """Clean up resources"""
