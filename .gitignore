@@ -31,7 +31,7 @@ Photobooth-master/output_images/
 .vscode/
 .idea/
 
-output_images/
+output/
 # Ignore backgrounds/photos ที่เป็นภาพตัวอย่าง (ถ้าไม่อยาก track)
 # Photobooth-master/backgrounds/photos/*.png
 # Photobooth-master/backgrounds/photos/*.jpg
