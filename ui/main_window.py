@@ -29,27 +29,27 @@ TARGET_FPS = 60
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BG_ROOT = PROJECT_ROOT / "resources" / "backgrounds" / "photos"
 
-# FRAB8 Graduation Theme Colors
-FRAB8_GOLD = "#D4AF37"
-FRAB8_NAVY = "#1A1F3A"
-FRAB8_LIGHT_GOLD = "#F4E4C1"
-FRAB8_DARK_NAVY = "#0F1423"
-FRAB8_WHITE = "#FFFFFF"
-FRAB8_ACCENT = "#8B7355"
+# FIBO Graduation Theme Colors
+FIBO_GOLD = "#D4AF37"
+FIBO_NAVY = "#1A1F3A"
+FIBO_LIGHT_GOLD = "#F4E4C1"
+FIBO_DARK_NAVY = "#0F1423"
+FIBO_WHITE = "#FFFFFF"
+FIBO_ACCENT = "#8B7355"
 
 # Graduation themed QSS
-FRAB8_GRADUATION_QSS = f"""
+FIBO_GRADUATION_QSS = f"""
 QWidget {{
-    background-color: {FRAB8_NAVY};
-    color: {FRAB8_WHITE};
+    background-color: {FIBO_NAVY};
+    color: {FIBO_WHITE};
     font-family: 'Segoe UI', Arial, sans-serif;
 }}
 
 QPushButton {{
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 {FRAB8_GOLD}, stop:1 {FRAB8_ACCENT});
-    color: {FRAB8_DARK_NAVY};
-    border: 2px solid {FRAB8_GOLD};
+        stop:0 {FIBO_GOLD}, stop:1 {FIBO_ACCENT});
+    color: {FIBO_DARK_NAVY};
+    border: 2px solid {FIBO_GOLD};
     border-radius: 12px;
     padding: 12px 20px;
     font-weight: bold;
@@ -58,12 +58,12 @@ QPushButton {{
 
 QPushButton:hover {{
     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 {FRAB8_LIGHT_GOLD}, stop:1 {FRAB8_GOLD});
-    border: 2px solid {FRAB8_LIGHT_GOLD};
+        stop:0 {FIBO_LIGHT_GOLD}, stop:1 {FIBO_GOLD});
+    border: 2px solid {FIBO_LIGHT_GOLD};
 }}
 
 QPushButton:pressed {{
-    background: {FRAB8_ACCENT};
+    background: {FIBO_ACCENT};
 }}
 
 QPushButton:checked {{
@@ -82,7 +82,7 @@ QPushButton:disabled {{
 QLabel[hero="true"] {{
     font-size: 48px;
     font-weight: bold;
-    color: {FRAB8_GOLD};
+    color: {FIBO_GOLD};
     font-family: 'Georgia', serif;
     text-transform: uppercase;
     letter-spacing: 3px;
@@ -91,46 +91,46 @@ QLabel[hero="true"] {{
 QLabel[section="true"] {{
     font-size: 22px;
     font-weight: bold;
-    color: {FRAB8_GOLD};
+    color: {FIBO_GOLD};
     padding: 15px;
-    background: {FRAB8_DARK_NAVY};
-    border: 3px solid {FRAB8_GOLD};
+    background: {FIBO_DARK_NAVY};
+    border: 3px solid {FIBO_GOLD};
     border-radius: 10px;
     margin: 5px 0;
 }}
 
 QLabel[subtitle="true"] {{
     font-size: 16px;
-    color: {FRAB8_LIGHT_GOLD};
+    color: {FIBO_LIGHT_GOLD};
     font-weight: 600;
 }}
 
 QFrame#line {{
-    background-color: {FRAB8_GOLD};
+    background-color: {FIBO_GOLD};
     max-height: 2px;
     margin: 10px 0;
 }}
 
 QScrollArea {{
     border: none;
-    background: {FRAB8_NAVY};
+    background: {FIBO_NAVY};
 }}
 
 QScrollBar:vertical {{
     border: none;
-    background: {FRAB8_DARK_NAVY};
+    background: {FIBO_DARK_NAVY};
     width: 12px;
     margin: 0;
 }}
 
 QScrollBar::handle:vertical {{
-    background: {FRAB8_GOLD};
+    background: {FIBO_GOLD};
     border-radius: 6px;
     min-height: 30px;
 }}
 
 QScrollBar::handle:vertical:hover {{
-    background: {FRAB8_LIGHT_GOLD};
+    background: {FIBO_LIGHT_GOLD};
 }}
 
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{
@@ -207,8 +207,8 @@ class DisplayWindow(QWidget):
     
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("FRAB8 Graduation PhotoBooth - Display")
-        self.setStyleSheet(FRAB8_GRADUATION_QSS)
+        self.setWindowTitle("FIBO Graduation PhotoBooth - Display")
+        self.setStyleSheet(FIBO_GRADUATION_QSS)
         
         # Normal window with standard controls (movable, closable)
         # Remove fullscreen, make it a normal window
@@ -219,7 +219,7 @@ class DisplayWindow(QWidget):
         layout.setSpacing(20)
         
         # Header with graduation theme
-        header = QLabel("🎓 FRAB8 GRADUATION 2025 🎓")
+        header = QLabel("🎓 FIBO GRADUATION 2025 🎓")
         header.setProperty("hero", True)
         header.setAlignment(Qt.AlignCenter)
         layout.addWidget(header)
@@ -229,7 +229,7 @@ class DisplayWindow(QWidget):
         self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setStyleSheet(f"""
             background-color: black;
-            border: 6px solid {FRAB8_GOLD};
+            border: 6px solid {FIBO_GOLD};
             border-radius: 20px;
         """)
         self.video_label.setScaledContents(False)
@@ -240,10 +240,10 @@ class DisplayWindow(QWidget):
         self.countdown_label.setAlignment(Qt.AlignCenter)
         self.countdown_label.setStyleSheet(f"""
             background: rgba(26, 31, 58, 220);
-            color: {FRAB8_GOLD};
+            color: {FIBO_GOLD};
             font-size: 180px;
             font-weight: bold;
-            border: 5px solid {FRAB8_GOLD};
+            border: 5px solid {FIBO_GOLD};
             border-radius: 25px;
         """)
         self.countdown_label.hide()
@@ -253,7 +253,7 @@ class DisplayWindow(QWidget):
         self.qr_label.setAlignment(Qt.AlignCenter)
         self.qr_label.setStyleSheet(f"""
             background: white;
-            border: 5px solid {FRAB8_GOLD};
+            border: 5px solid {FIBO_GOLD};
             border-radius: 15px;
             padding: 20px;
         """)
@@ -262,19 +262,8 @@ class DisplayWindow(QWidget):
         self.qr_text_label = QLabel("Scan to Download Your Photos!")
         self.qr_text_label.setProperty("subtitle", True)
         self.qr_text_label.setAlignment(Qt.AlignCenter)
-        self.qr_text_label.setStyleSheet(f"font-size: 24px; color: {FRAB8_GOLD}; margin-top: 10px;")
+        self.qr_text_label.setStyleSheet(f"font-size: 24px; color: {FIBO_GOLD}; margin-top: 10px;")
         self.qr_text_label.hide()
-        
-        # FPS info
-        self.info_label = QLabel("FPS: --")
-        self.info_label.setStyleSheet(f"""
-            padding: 12px 18px;
-            background: rgba(212, 175, 55, 0.9);
-            color: {FRAB8_DARK_NAVY};
-            border-radius: 10px;
-            font-weight: bold;
-            font-size: 16px;
-        """)
         
         # Stack video and countdown in fixed container
         video_container = QWidget()
@@ -304,24 +293,13 @@ class DisplayWindow(QWidget):
             font-size: 32px; 
             font-weight: bold;
             background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-                stop:0 {FRAB8_GOLD}, stop:1 {FRAB8_ACCENT});
-            color: {FRAB8_DARK_NAVY};
-            border: 5px solid {FRAB8_GOLD};
+                stop:0 {FIBO_GOLD}, stop:1 {FIBO_ACCENT});
+            color: {FIBO_DARK_NAVY};
+            border: 5px solid {FIBO_GOLD};
             border-radius: 25px;
             padding: 20px;
         """)
         layout.addWidget(self.capture_btn)
-        
-        # Footer with FPS and instruction
-        footer_layout = QHBoxLayout()
-        footer_layout.addWidget(self.info_label)
-        footer_layout.addStretch()
-        
-        instruction = QLabel("Drag to move | Close with X button")
-        instruction.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 14px;")
-        footer_layout.addWidget(instruction)
-        
-        layout.addLayout(footer_layout)
         
         self.setLayout(layout)
     
@@ -367,10 +345,6 @@ class DisplayWindow(QWidget):
         scaled = pixmap.scaled(self.video_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
         self.video_label.setPixmap(scaled)
     
-    def update_fps(self, fps: float):
-        """Update FPS display"""
-        self.info_label.setText(f"FPS: {fps:0.1f}")
-    
     def show_countdown(self, value: int):
         """Show countdown number"""
         self.qr_label.hide()
@@ -401,7 +375,7 @@ class DisplayWindow(QWidget):
             self.qr_label.setFixedSize(400, 400)
             self.qr_label.setStyleSheet(f"""
                 background: white;
-                border: 5px solid {FRAB8_GOLD};
+                border: 5px solid {FIBO_GOLD};
                 border-radius: 15px;
                 padding: 60px;
                 font-size: 20px;
@@ -417,6 +391,13 @@ class DisplayWindow(QWidget):
         """Hide QR code display"""
         self.qr_container.hide()
 
+    def set_capture_enabled(self, enabled: bool):
+        """Enable/disable capture button"""
+        self.capture_btn.setEnabled(enabled)
+        if enabled:
+            self.capture_btn.setText("📸 CAPTURE PHOTO")
+        else:
+            self.capture_btn.setText("⏳ Processing...")
 
 # ============================================================
 # CONTROL WINDOW - Shows all controls and settings
@@ -437,8 +418,8 @@ class ControlWindow(QWidget):
         self.bg_manager = bg_manager
         self.outline_manager = outline_manager
         
-        self.setWindowTitle("FRAB8 Graduation PhotoBooth - Controls")
-        self.setStyleSheet(FRAB8_GRADUATION_QSS)
+        self.setWindowTitle("FIBO Graduation PhotoBooth - Controls")
+        self.setStyleSheet(FIBO_GRADUATION_QSS)
         
         # Normal window with standard controls (movable, closable)
         # Remove fullscreen
@@ -463,7 +444,7 @@ class ControlWindow(QWidget):
         main_layout.setSpacing(20)
         
         # Title section
-        title = QLabel("🎓 FRAB8")
+        title = QLabel("🎓 FIBO")
         title.setProperty("hero", True)
         title.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title)
@@ -488,23 +469,17 @@ class ControlWindow(QWidget):
         content_layout.setContentsMargins(10, 10, 10, 10)
         
         # Add all control sections with clear separation
-        content_layout.addLayout(self._create_props_section())
+        # content_layout.addLayout(self._create_props_section())
+        # content_layout.addWidget(self._make_separator())
+        
+        content_layout.addLayout(self._create_background_section())
         content_layout.addWidget(self._make_separator())
         
         content_layout.addLayout(self._create_outline_section())
-        content_layout.addWidget(self._make_separator())
-        
-        content_layout.addLayout(self._create_background_section())
         content_layout.addStretch()
         
         scroll.setWidget(content_widget)
         main_layout.addWidget(scroll, stretch=1)
-        
-        # Footer
-        footer = QLabel("Press ESC to exit fullscreen | F11 to toggle")
-        footer.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 14px; padding: 15px;")
-        footer.setAlignment(Qt.AlignCenter)
-        main_layout.addWidget(footer)
         
         self.setLayout(main_layout)
     
@@ -512,7 +487,7 @@ class ControlWindow(QWidget):
         """Create a visual separator between sections"""
         separator = QFrame()
         separator.setFrameShape(QFrame.HLine)
-        separator.setStyleSheet(f"background-color: {FRAB8_GOLD}; max-height: 3px; margin: 15px 0;")
+        separator.setStyleSheet(f"background-color: {FIBO_GOLD}; max-height: 3px; margin: 15px 0;")
         return separator
     
     def _create_background_section(self):
@@ -526,7 +501,7 @@ class ControlWindow(QWidget):
         
         # Video background note
         note = QLabel("💡 Video backgrounds supported")
-        note.setStyleSheet(f"color: {FRAB8_LIGHT_GOLD}; font-size: 14px; padding: 8px;")
+        note.setStyleSheet(f"color: {FIBO_LIGHT_GOLD}; font-size: 14px; padding: 8px;")
         note.setAlignment(Qt.AlignCenter)
         section.addWidget(note)
         
@@ -577,7 +552,7 @@ class ControlWindow(QWidget):
         color_widget = QVBoxLayout()
         color_label = QLabel("Color")
         color_label.setAlignment(Qt.AlignCenter)
-        color_label.setStyleSheet(f"font-size: 16px; color: {FRAB8_LIGHT_GOLD}; margin-bottom: 5px;")
+        color_label.setStyleSheet(f"font-size: 16px; color: {FIBO_LIGHT_GOLD}; margin-bottom: 5px;")
         color_widget.addWidget(color_label)
         
         self.color_btn = QPushButton()
@@ -632,7 +607,7 @@ class ControlWindow(QWidget):
         
         self.logo_btn = QPushButton("🏫\nSchool Logo")
         self.logo_btn.setCheckable(True)
-        self.logo_btn.setChecked(True)
+        # self.logo_btn.setChecked(True)
         self.logo_btn.setFixedSize(btn_width, btn_height)
         self.logo_btn.setStyleSheet("font-size: 18px; line-height: 1.5;")
         self.logo_btn.clicked.connect(lambda: self.prop_toggled.emit("logo", self.logo_btn.isChecked()))
@@ -672,7 +647,7 @@ class ControlWindow(QWidget):
         c = self.outline_manager.current_color
         self.color_btn.setStyleSheet(
             f"background-color: rgb({c[2]}, {c[1]}, {c[0]}); "
-            f"border: 3px solid {FRAB8_GOLD}; "
+            f"border: 3px solid {FIBO_GOLD}; "
             f"border-radius: 12px; "
             f"min-height: 60px;"
         )
@@ -710,6 +685,12 @@ class PhotoBoothApp(QWidget):
         self.latest_processed_frame = None
         self.latest_photo_path = None
         
+        # Video recording state
+        self.is_recording = False
+        self.video_writer = None
+        self.video_frames = []
+        self.video_path = None
+        
         # Create windows
         self.display_window = DisplayWindow()
         self.control_window = ControlWindow(self.bg_manager, self.outline_manager)
@@ -746,7 +727,7 @@ class PhotoBoothApp(QWidget):
         # Connect threads
         self.camera.frame_ready.connect(self._on_camera_frame, Qt.QueuedConnection)
         self.processor.processed_ready.connect(self._display_qimage, Qt.QueuedConnection)
-        self.processor.fps_ready.connect(self._update_fps, Qt.QueuedConnection)
+        # FPS display removed - no longer needed
         
         # Position windows on different screens if available
         self._position_windows()
@@ -840,12 +821,12 @@ class PhotoBoothApp(QWidget):
         arr = np.frombuffer(ptr, np.uint8).reshape((height, width, 3))
         self.latest_processed_frame = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
         
+        # If recording, save frame to video buffer
+        if self.is_recording and self.latest_processed_frame is not None:
+            self.video_frames.append(self.latest_processed_frame.copy())
+        
         # Update display
         self.display_window.update_frame(qimg)
-    
-    @pyqtSlot(float)
-    def _update_fps(self, fps: float):
-        self.display_window.update_fps(fps)
     
     def _set_outline_style(self, style: str):
         self.outline_manager.current_style = style
@@ -867,7 +848,10 @@ class PhotoBoothApp(QWidget):
         self.photobooth_mode = True
         self.display_window.set_capture_enabled(False)
         
-        self.countdown_value = 3
+        # Start video recording
+        self._start_video_recording()
+        
+        self.countdown_value = 5
         self.display_window.show_countdown(self.countdown_value)
         self.countdown_timer.start(1000)
     
@@ -900,7 +884,7 @@ class PhotoBoothApp(QWidget):
         out_dir = PROJECT_ROOT / "resources" / "output_images"
         out_dir.mkdir(exist_ok=True)
         now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        out_path = out_dir / f"FRAB8_Grad_{now}.png"
+        out_path = out_dir / f"FIBO_Grad_{now}.png"
         cv2.imwrite(str(out_path), self.latest_processed_frame)
         
         self.latest_photo_path = str(out_path)
@@ -909,6 +893,9 @@ class PhotoBoothApp(QWidget):
     def _finish_capture(self):
         self.countdown_timer.stop()
         self.display_window.hide_countdown()
+        
+        # Stop video recording and save
+        self._stop_video_recording()
         
         # Generate and show QR code
         self._generate_qr_code()
@@ -964,6 +951,59 @@ class PhotoBoothApp(QWidget):
     def _reset_photobooth_mode(self):
         self.photobooth_mode = False
         self.display_window.set_capture_enabled(True)
+    
+    def _start_video_recording(self):
+        """Start recording video frames"""
+        from datetime import datetime
+        
+        self.is_recording = True
+        self.video_frames = []
+        
+        # Generate video filename
+        out_dir = PROJECT_ROOT / "resources" / "output_images"
+        out_dir.mkdir(exist_ok=True)
+        now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
+        self.video_path = out_dir / f"FIBO_Grad_video_{now}.mp4"
+        
+        print(f"[Video] Started recording: {self.video_path}")
+    
+    def _stop_video_recording(self):
+        """Stop recording and save video file"""
+        if not self.is_recording:
+            return
+        
+        self.is_recording = False
+        
+        if len(self.video_frames) == 0:
+            print("[Video] No frames recorded")
+            return
+        
+        try:
+            # Get video properties from first frame
+            height, width = self.video_frames[0].shape[:2]
+            fps = 10  # Target FPS for output video
+
+            # Create video writer
+            fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # or 'avc1' for H.264
+            out = cv2.VideoWriter(str(self.video_path), fourcc, fps, (width, height))
+            
+            if not out.isOpened():
+                print("[Video] Failed to open video writer")
+                return
+            
+            # Write all frames
+            for frame in self.video_frames:
+                out.write(frame)
+            
+            out.release()
+            
+            print(f"[Video] Saved {len(self.video_frames)} frames to: {self.video_path}")
+            print(f"[Video] Duration: {len(self.video_frames) / fps:.2f} seconds")
+            
+        except Exception as e:
+            print(f"[Video] Error saving video: {e}")
+        finally:
+            self.video_frames = []
     
     def cleanup(self):
         """Clean up resources"""
