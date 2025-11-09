@@ -1,8 +1,11 @@
 import cv2
 import numpy as np
+from math import ceil
 from collections import deque
 from pathlib import Path
 from typing import Optional, Tuple
+import os
+import datetime
 
 from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QSize, QTimer
 from PyQt5.QtGui import QPixmap, QImage, QIcon, QFont
@@ -27,7 +30,7 @@ CAMERA_HEIGHT = 720
 TARGET_FPS = 60
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
-BG_ROOT = PROJECT_ROOT / "resources" / "backgrounds" / "photos"
+BG_ROOT = PROJECT_ROOT / "resource" / "backgrounds"
 
 # FIBO Graduation Theme Colors
 FIBO_GOLD = "#D4AF37"
@@ -202,6 +205,9 @@ def create_photobooth_frame(images: list, frame_config_name="fibooth_modern"):
 # ============================================================
 # DISPLAY WINDOW - Shows only the video preview
 # ============================================================
+# ============================================================
+# DISPLAY WINDOW - Shows only the video preview
+# ============================================================
 class DisplayWindow(QWidget):
     """Window that displays the video preview and countdown"""
     
@@ -209,9 +215,6 @@ class DisplayWindow(QWidget):
         super().__init__()
         self.setWindowTitle("FIBO Graduation PhotoBooth - Display")
         self.setStyleSheet(FIBO_GRADUATION_QSS)
-        
-        # Normal window with standard controls (movable, closable)
-        # Remove fullscreen, make it a normal window
         
         # Main layout
         layout = QVBoxLayout()
@@ -224,6 +227,12 @@ class DisplayWindow(QWidget):
         header.setAlignment(Qt.AlignCenter)
         layout.addWidget(header)
         
+        # Video container with stacked layout for overlays
+        video_container = QWidget()
+        video_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        video_container_layout = QVBoxLayout(video_container)
+        video_container_layout.setContentsMargins(0, 0, 0, 0)
+        
         # Video preview
         self.video_label = QLabel()
         self.video_label.setAlignment(Qt.AlignCenter)
@@ -233,10 +242,12 @@ class DisplayWindow(QWidget):
             border-radius: 20px;
         """)
         self.video_label.setScaledContents(False)
-        self.video_label.setSizePolicy(QSizePolicy.Ignored, QSizePolicy.Ignored)
+        self.video_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self.video_label.setMinimumSize(800, 600)
+        video_container_layout.addWidget(self.video_label)
         
-        # Countdown overlay
-        self.countdown_label = QLabel("")
+        # Countdown overlay (child of video_label for proper positioning)
+        self.countdown_label = QLabel(self.video_label)
         self.countdown_label.setAlignment(Qt.AlignCenter)
         self.countdown_label.setStyleSheet(f"""
             background: rgba(26, 31, 58, 220);
@@ -247,6 +258,13 @@ class DisplayWindow(QWidget):
             border-radius: 25px;
         """)
         self.countdown_label.hide()
+        self.countdown_label.raise_()  # Ensure it's on top
+        
+        # QR Code container (child of video_label)
+        self.qr_container = QWidget(self.video_label)
+        qr_container_layout = QVBoxLayout(self.qr_container)
+        qr_container_layout.setContentsMargins(0, 0, 0, 0)
+        qr_container_layout.setSpacing(20)
         
         # QR Code display
         self.qr_label = QLabel()
@@ -257,32 +275,25 @@ class DisplayWindow(QWidget):
             border-radius: 15px;
             padding: 20px;
         """)
-        self.qr_label.hide()
+        self.qr_label.setFixedSize(400, 400)
+        qr_container_layout.addWidget(self.qr_label, alignment=Qt.AlignCenter)
         
         self.qr_text_label = QLabel("Scan to Download Your Photos!")
         self.qr_text_label.setProperty("subtitle", True)
         self.qr_text_label.setAlignment(Qt.AlignCenter)
-        self.qr_text_label.setStyleSheet(f"font-size: 24px; color: {FIBO_GOLD}; margin-top: 10px;")
-        self.qr_text_label.hide()
+        self.qr_text_label.setStyleSheet(f"""
+            font-size: 28px; 
+            font-weight: bold;
+            color: {FIBO_GOLD}; 
+            background: rgba(26, 31, 58, 200);
+            padding: 15px 30px;
+            border: 3px solid {FIBO_GOLD};
+            border-radius: 15px;
+        """)
+        qr_container_layout.addWidget(self.qr_text_label, alignment=Qt.AlignCenter)
         
-        # Stack video and countdown in fixed container
-        video_container = QWidget()
-        video_container.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        video_layout = QVBoxLayout(video_container)
-        video_layout.setContentsMargins(0, 0, 0, 0)
-        
-        # Add video label to container
-        video_layout.addWidget(self.video_label, stretch=1, alignment=Qt.AlignCenter)
-        
-        # Overlay countdown and QR on top of video
-        self.countdown_label.setParent(self.video_label)
-        self.countdown_label.setGeometry(0, 0, self.video_label.width(), self.video_label.height())
-        
-        self.qr_container = QWidget(self.video_label)
-        qr_layout = QVBoxLayout(self.qr_container)
-        qr_layout.addWidget(self.qr_label, alignment=Qt.AlignCenter)
-        qr_layout.addWidget(self.qr_text_label, alignment=Qt.AlignCenter)
         self.qr_container.hide()
+        self.qr_container.raise_()  # Ensure it's on top
         
         layout.addWidget(video_container, stretch=1)
         
@@ -302,30 +313,66 @@ class DisplayWindow(QWidget):
         layout.addWidget(self.capture_btn)
         
         self.setLayout(layout)
+        
+        # Initial positioning of overlays
+        QTimer.singleShot(100, self._position_overlays)
+    
+    def _position_overlays(self):
+        """Position countdown and QR overlays to center on video"""
+        if not self.video_label.pixmap():
+            # No video yet, use full video_label size
+            video_width = self.video_label.width()
+            video_height = self.video_label.height()
+        else:
+            # Use actual video content size
+            pixmap = self.video_label.pixmap()
+            video_width = pixmap.width()
+            video_height = pixmap.height()
+            
+            # Scale to fit in video_label
+            label_width = self.video_label.width()
+            label_height = self.video_label.height()
+            
+            # Calculate scaled dimensions (keeping aspect ratio)
+            scale = min(label_width / video_width, label_height / video_height)
+            video_width = int(video_width * scale)
+            video_height = int(video_height * scale)
+        
+        # Center position in video_label
+        x_offset = (self.video_label.width() - video_width) // 2
+        y_offset = (self.video_label.height() - video_height) // 2
+        
+        # Position countdown (80% of video area, centered)
+        countdown_width = int(video_width * 0.8)
+        countdown_height = int(video_height * 0.8)
+        countdown_x = x_offset + (video_width - countdown_width) // 2
+        countdown_y = y_offset + (video_height - countdown_height) // 2
+        
+        self.countdown_label.setGeometry(
+            countdown_x,
+            countdown_y,
+            countdown_width,
+            countdown_height
+        )
+        
+        # Position QR container (60% of video area, centered)
+        qr_container_width = int(video_width * 0.6)
+        qr_container_height = int(video_height * 0.7)
+        qr_x = x_offset + (video_width - qr_container_width) // 2
+        qr_y = y_offset + (video_height - qr_container_height) // 2
+        
+        self.qr_container.setGeometry(
+            qr_x,
+            qr_y,
+            qr_container_width,
+            qr_container_height
+        )
     
     def resizeEvent(self, event):
         """Handle window resize to reposition overlays"""
         super().resizeEvent(event)
-        if hasattr(self, 'countdown_label'):
-            # Center countdown on video label
-            video_rect = self.video_label.geometry()
-            countdown_size = min(video_rect.width(), video_rect.height()) * 0.8
-            self.countdown_label.setGeometry(
-                int(video_rect.width() * 0.1),
-                int(video_rect.height() * 0.3),
-                int(video_rect.width() * 0.8),
-                int(video_rect.height() * 0.4)
-            )
-            
-        if hasattr(self, 'qr_container'):
-            # Center QR container
-            video_rect = self.video_label.geometry()
-            self.qr_container.setGeometry(
-                int(video_rect.width() * 0.2),
-                int(video_rect.height() * 0.2),
-                int(video_rect.width() * 0.6),
-                int(video_rect.height() * 0.6)
-            )
+        # Delay positioning to ensure video_label has updated size
+        QTimer.singleShot(10, self._position_overlays)
     
     def keyPressEvent(self, event):
         """Handle keyboard shortcuts"""
@@ -342,18 +389,30 @@ class DisplayWindow(QWidget):
     def update_frame(self, qimg: QImage):
         """Update the video display"""
         pixmap = QPixmap.fromImage(qimg)
-        scaled = pixmap.scaled(self.video_label.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation)
+        scaled = pixmap.scaled(
+            self.video_label.size(), 
+            Qt.KeepAspectRatio, 
+            Qt.SmoothTransformation
+        )
         self.video_label.setPixmap(scaled)
+        
+        # Reposition overlays when video updates (first frame or size change)
+        if not hasattr(self, '_video_initialized'):
+            self._video_initialized = True
+            QTimer.singleShot(50, self._position_overlays)
     
     def show_countdown(self, value: int):
         """Show countdown number"""
-        self.qr_label.hide()
-        self.qr_text_label.hide()
+        self.qr_container.hide()
+        
         if value > 0:
             self.countdown_label.setText(str(value))
         else:
             self.countdown_label.setText("📸 SMILE!")
+        
         self.countdown_label.show()
+        self.countdown_label.raise_()  # Ensure on top
+        self._position_overlays()  # Ensure proper position
     
     def hide_countdown(self):
         """Hide countdown overlay"""
@@ -368,21 +427,22 @@ class DisplayWindow(QWidget):
             pixmap = QPixmap.fromImage(qr_image)
             scaled = pixmap.scaled(400, 400, Qt.KeepAspectRatio, Qt.SmoothTransformation)
             self.qr_label.setPixmap(scaled)
-            self.qr_label.setFixedSize(400, 400)
         else:
             # Placeholder text if no QR library available
-            self.qr_label.setText("QR Code Here\n\n(QR library not available)")
-            self.qr_label.setFixedSize(400, 400)
+            self.qr_label.setText("QR Code Here\n\n(Install qrcode library)")
             self.qr_label.setStyleSheet(f"""
                 background: white;
                 border: 5px solid {FIBO_GOLD};
                 border-radius: 15px;
-                padding: 60px;
-                font-size: 20px;
+                padding: 40px;
+                font-size: 18px;
+                font-weight: bold;
                 color: black;
             """)
         
         self.qr_container.show()
+        self.qr_container.raise_()  # Ensure on top
+        self._position_overlays()  # Ensure proper position
         
         # Auto-hide after 10 seconds
         QTimer.singleShot(10000, self.hide_qr_code)
@@ -841,17 +901,36 @@ class PhotoBoothApp(QWidget):
         self.processor.props_enabled[prop_name] = enabled
         print(f"{prop_name.capitalize()}: {'ON' if enabled else 'OFF'}")
     
+    def create_new_session(self, base_dir="resource/output"):
+        # Example: session_20251109_211522
+        session_name = datetime.datetime.now().strftime("session_%Y%m%d_%H%M%S")
+
+        # Combine into full path
+        session_dir = Path(base_dir) / session_name
+
+        # Create folder
+        session_dir.mkdir(parents=True, exist_ok=True)
+
+        print(f"✅ Created session: {session_dir}")
+        return session_dir
+
     def _capture_single_photo(self):
         if self.photobooth_mode:
             return
         
+        self.session = self.create_new_session(PROJECT_ROOT / 'resource' / 'output')
         self.photobooth_mode = True
         self.display_window.set_capture_enabled(False)
-        
+
+        self.bg_manager.restart_background()
+        duration_sec = self.bg_manager.get_video_length()
+        if duration_sec is None:
+            duration_sec = 5
+
         # Start video recording
         self._start_video_recording()
         
-        self.countdown_value = 5
+        self.countdown_value = ceil(duration_sec)
         self.display_window.show_countdown(self.countdown_value)
         self.countdown_timer.start(1000)
     
@@ -859,7 +938,7 @@ class PhotoBoothApp(QWidget):
         self.countdown_value -= 1
         if self.countdown_value > 0:
             self.display_window.show_countdown(self.countdown_value)
-        elif self.countdown_value == 0:
+        elif self.countdown_value <= 0:
             self.display_window.show_countdown(0)
             QTimer.singleShot(300, self._save_single_image)
             QTimer.singleShot(800, self._finish_capture)
@@ -881,10 +960,7 @@ class PhotoBoothApp(QWidget):
         print(f"[Photobooth] Captured image {len(self.captured_images)}")
         
         # Save individual photo
-        out_dir = PROJECT_ROOT / "resources" / "output_images"
-        out_dir.mkdir(exist_ok=True)
-        now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        out_path = out_dir / f"FIBO_Grad_{now}.png"
+        out_path = self.session / f"FIBO_Grad.png"
         cv2.imwrite(str(out_path), self.latest_processed_frame)
         
         self.latest_photo_path = str(out_path)
@@ -902,51 +978,49 @@ class PhotoBoothApp(QWidget):
         
         self._reset_photobooth_mode()
     
+
     def _generate_qr_code(self):
-        """Generate QR code for photo download"""
+        from pathlib import Path
+        import qrcode
+        from io import BytesIO
+        from PyQt5.QtGui import QImage
         try:
-            # Try to import qrcode library
             import qrcode
-            from io import BytesIO
-            
+
             if self.latest_photo_path:
-                # Create URL or path for photo download
-                # You can replace this with your actual server URL
-                download_url = f"http://yourserver.com/download/{Path(self.latest_photo_path).name}"
-                
-                # Generate QR code
+                base_url = "https://8204764a88d7.ngrok-free.app"
+
+
+                # Combine them into one QR code text
+                qr_data = f"{base_url}/{self.session.name}"
+
                 qr = qrcode.QRCode(
                     version=1,
-                    error_correction=qrcode.constants.ERROR_CORRECT_L,
-                    box_size=10,
-                    border=4,
+                    error_correction=qrcode.constants.ERROR_CORRECT_M,
+                    box_size=8,
+                    border=2,
                 )
-                qr.add_data(download_url)
+                qr.add_data(qr_data)
                 qr.make(fit=True)
-                
-                # Create QR code image
+
+                # Convert to QImage for PyQt display
                 qr_img = qr.make_image(fill_color="black", back_color="white")
-                
-                # Convert PIL image to QImage
                 buffer = BytesIO()
-                qr_img.save(buffer, format='PNG')
+                qr_img.save(buffer, format="PNG")
                 buffer.seek(0)
-                
+
                 qimage = QImage()
                 qimage.loadFromData(buffer.read())
-                
+
                 self.display_window.show_qr_code(qimage)
+
             else:
-                # Show placeholder if no photo path
                 self.display_window.show_qr_code(None)
-                
-        except ImportError:
-            print("[INFO] qrcode library not installed. Install with: pip install qrcode[pil]")
-            # Show placeholder QR code
-            self.display_window.show_qr_code(None)
+
         except Exception as e:
-            print(f"[ERROR] Failed to generate QR code: {e}")
+            print(f"[ERROR] QR generation failed: {e}")
             self.display_window.show_qr_code(None)
+
     
     def _reset_photobooth_mode(self):
         self.photobooth_mode = False
@@ -960,10 +1034,7 @@ class PhotoBoothApp(QWidget):
         self.video_frames = []
         
         # Generate video filename
-        out_dir = PROJECT_ROOT / "resources" / "output_images"
-        out_dir.mkdir(exist_ok=True)
-        now = datetime.now().strftime("%Y%m%d_%H%M%S_%f")[:-3]
-        self.video_path = out_dir / f"FIBO_Grad_video_{now}.mp4"
+        self.video_path = self.session / f"FIBO_Grad_video.mp4"
         
         print(f"[Video] Started recording: {self.video_path}")
     
@@ -1006,7 +1077,7 @@ class PhotoBoothApp(QWidget):
             self.video_frames = []
     
     def cleanup(self):
-        """Clean up resources"""
+        """Clean up resource"""
         try:
             self.camera.stop()
             self.processor.stop()

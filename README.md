@@ -19,5 +19,12 @@ pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu12
 
 ## How to use
 ``` bash
+python server.py
+```
+``` bash
+ngrok http 5000
+```
+Copy Forwarding link from ngrok to base_url in qrcode
+``` bsah
 python main.py
 ```
