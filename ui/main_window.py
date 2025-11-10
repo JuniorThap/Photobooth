@@ -240,7 +240,7 @@ class DisplayWindow(QWidget):
         self.video_label = QLabel()
         self.video_label.setAlignment(Qt.AlignCenter)
         self.video_label.setStyleSheet(f"""
-            background-color: black;
+            background-color: {FIBO_NAVY};
             border: 6px solid {FIBO_GOLD};
             border-radius: 20px;
         """)
@@ -252,14 +252,15 @@ class DisplayWindow(QWidget):
         # Countdown overlay (child of video_label for proper positioning)
         self.countdown_label = QLabel(self.video_label)
         self.countdown_label.setAlignment(Qt.AlignCenter)
-        self.countdown_label.setStyleSheet(f"""
-            background: rgba(26, 31, 58, 220);
-            color: {FIBO_GOLD};
-            font-size: 180px;
-            font-weight: bold;
-            border: 5px solid {FIBO_GOLD};
+        self.countdown_label.setStyleSheet("""
+            background-color: rgba(0, 0, 0, 0);           /* fully transparent background */
+            color: rgba(212, 175, 55, 180);               /* gold text with ~70% opacity */
+            border: 5px solid rgba(0, 0, 0, 0);    /* semi-transparent gold border */
             border-radius: 25px;
+            font-size: 128px;
+            font-weight: bold;
         """)
+
         self.countdown_label.hide()
         self.countdown_label.raise_()  # Ensure it's on top
         
@@ -765,15 +766,7 @@ class PhotoBoothApp(QWidget):
         self.filter_manager = FilterManager()
         self.outline_manager = OutlineManager()
         self.face_manager = FaceManager()
-        self.printer_manager = PrinterManager(default_size="4x6")
-
-        # Get available printers
-        printers = self.printer_manager.get_available_printers()
-        if printers:
-            print(f"[PrinterManager] Found printers: {printers}")
-            self.printer_manager.default_printer = printers[0]
-        else:
-            print("[PrinterManager] No printers found")
+        self.printer_manager = PrinterManager()
         
         # Photobooth state
         self.photobooth_mode = False
@@ -942,71 +935,7 @@ class PhotoBoothApp(QWidget):
         print(f"{prop_name.capitalize()}: {'ON' if enabled else 'OFF'}")
 
     def _print_photo(self):
-        """Handle print button click"""
-        if not self.latest_photo_path or not Path(self.latest_photo_path).exists():
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.warning(
-                self.display_window,
-                "Print Error",
-                "No photo available to print. Please capture a photo first."
-            )
-            return
-        
-        # Read the image
-        image = cv2.imread(self.latest_photo_path)
-        if image is None:
-            from PyQt5.QtWidgets import QMessageBox
-            QMessageBox.warning(
-                self.display_window,
-                "Print Error",
-                "Failed to read photo file."
-            )
-            return
-        
-        # Disable print button during printing
-        self.display_window.set_print_enabled(False)
-        
-        # Print in background to avoid blocking UI
-        from PyQt5.QtCore import QThread
-        
-        class PrintThread(QThread):
-            finished = pyqtSignal(bool)
-            
-            def __init__(self, printer_manager, image):
-                super().__init__()
-                self.printer_manager = printer_manager
-                self.image = image
-            
-            def run(self):
-                success = self.printer_manager.print_image(
-                    self.image,
-                    size="4x6",
-                    copies=1
-                )
-                self.finished.emit(success)
-        
-        def on_print_finished(success):
-            from PyQt5.QtWidgets import QMessageBox
-            self.display_window.set_print_enabled(True)
-            
-            if success:
-                QMessageBox.information(
-                    self.display_window,
-                    "Print Success",
-                    "Photo sent to printer successfully! ✅"
-                )
-            else:
-                QMessageBox.warning(
-                    self.display_window,
-                    "Print Error",
-                    "Failed to print photo. Please check printer connection."
-                )
-        
-        self.print_thread = PrintThread(self.printer_manager, image)
-        self.print_thread.finished.connect(on_print_finished)
-        self.print_thread.start()
-        
-        print("[PhotoBooth] Print job initiated")
+        self.printer_manager.print_image(self.latest_photo_path)
     
     def create_new_session(self, base_dir="resource/output"):
         # Example: session_20251109_211522
@@ -1072,6 +1001,8 @@ class PhotoBoothApp(QWidget):
         
         self.latest_photo_path = str(out_path)
         print(f"[Photobooth] Saved photo: {out_path}")
+
+        self.display_window.print_btn.setEnabled(True)
     
     def _finish_capture(self):
         self.countdown_timer.stop()
@@ -1095,7 +1026,7 @@ class PhotoBoothApp(QWidget):
             import qrcode
 
             if self.latest_photo_path:
-                base_url = "https://8204764a88d7.ngrok-free.app"
+                base_url = "https://60132d191384.ngrok-free.app"
 
 
                 # Combine them into one QR code text
