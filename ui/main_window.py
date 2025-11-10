@@ -19,6 +19,7 @@ from managers.filter_manager import FilterManager
 from managers.outline_manager import OutlineManager
 from managers.segment_manager import create_segment
 from managers.face_manager import FaceManager
+from managers.printer_manager import PrinterManager
 
 from core.ProcessorWorker import ProcessorWorker
 from core.CameraWorker import CameraWorker
@@ -210,6 +211,8 @@ def create_photobooth_frame(images: list, frame_config_name="fibooth_modern"):
 # ============================================================
 class DisplayWindow(QWidget):
     """Window that displays the video preview and countdown"""
+
+    print_requested = pyqtSignal()
     
     def __init__(self):
         super().__init__()
@@ -298,6 +301,27 @@ class DisplayWindow(QWidget):
         layout.addWidget(video_container, stretch=1)
         
         # Large capture button at bottom
+        # self.capture_btn = QPushButton("📸 CAPTURE PHOTO")
+        # self.capture_btn.setMinimumHeight(100)
+        # self.capture_btn.setStyleSheet(f"""
+        #     font-size: 32px; 
+        #     font-weight: bold;
+        #     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        #         stop:0 {FIBO_GOLD}, stop:1 {FIBO_ACCENT});
+        #     color: {FIBO_DARK_NAVY};
+        #     border: 5px solid {FIBO_GOLD};
+        #     border-radius: 25px;
+        #     padding: 20px;
+        # """)
+        # layout.addWidget(self.capture_btn)
+        
+        self.setLayout(layout)
+
+        # Button container for Capture and Print buttons
+        button_layout = QHBoxLayout()
+        button_layout.setSpacing(20)
+        
+        # Large capture button
         self.capture_btn = QPushButton("📸 CAPTURE PHOTO")
         self.capture_btn.setMinimumHeight(100)
         self.capture_btn.setStyleSheet(f"""
@@ -310,7 +334,26 @@ class DisplayWindow(QWidget):
             border-radius: 25px;
             padding: 20px;
         """)
-        layout.addWidget(self.capture_btn)
+        button_layout.addWidget(self.capture_btn)
+
+        # Print button
+        self.print_btn = QPushButton("🖨️ PRINT PHOTO")
+        self.print_btn.setMinimumHeight(100)
+        self.print_btn.setEnabled(False)  # Disabled until photo is taken
+        self.print_btn.setStyleSheet(f"""
+            font-size: 32px; 
+            font-weight: bold;
+            background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+                stop:0 #4A7C59, stop:1 #2D5A3D);
+            color: white;
+            border: 5px solid #5A9C6F;
+            border-radius: 25px;
+            padding: 20px;
+        """)
+        self.print_btn.clicked.connect(self.print_requested.emit)
+        button_layout.addWidget(self.print_btn)
+        
+        layout.addLayout(button_layout)
         
         self.setLayout(layout)
         
@@ -737,6 +780,15 @@ class PhotoBoothApp(QWidget):
         self.filter_manager = FilterManager()
         self.outline_manager = OutlineManager()
         self.face_manager = FaceManager()
+        self.printer_manager = PrinterManager(default_size="4x6")
+
+        # Get available printers
+        printers = self.printer_manager.get_available_printers()
+        if printers:
+            print(f"[PrinterManager] Found printers: {printers}")
+            self.printer_manager.default_printer = printers[0]
+        else:
+            print("[PrinterManager] No printers found")
         
         # Photobooth state
         self.photobooth_mode = False
@@ -757,6 +809,9 @@ class PhotoBoothApp(QWidget):
         
         # Connect capture button from display window
         self.display_window.capture_btn.clicked.connect(self._capture_single_photo)
+
+        # Connect print button from display window
+        self.display_window.print_requested.connect(self._print_photo)
         
         # Connect control signals
         self.control_window.capture_requested.connect(self._capture_single_photo)  # Keep for compatibility
@@ -900,6 +955,73 @@ class PhotoBoothApp(QWidget):
     def _toggle_prop(self, prop_name: str, enabled: bool):
         self.processor.props_enabled[prop_name] = enabled
         print(f"{prop_name.capitalize()}: {'ON' if enabled else 'OFF'}")
+
+    def _print_photo(self):
+        """Handle print button click"""
+        if not self.latest_photo_path or not Path(self.latest_photo_path).exists():
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self.display_window,
+                "Print Error",
+                "No photo available to print. Please capture a photo first."
+            )
+            return
+        
+        # Read the image
+        image = cv2.imread(self.latest_photo_path)
+        if image is None:
+            from PyQt5.QtWidgets import QMessageBox
+            QMessageBox.warning(
+                self.display_window,
+                "Print Error",
+                "Failed to read photo file."
+            )
+            return
+        
+        # Disable print button during printing
+        self.display_window.set_print_enabled(False)
+        
+        # Print in background to avoid blocking UI
+        from PyQt5.QtCore import QThread
+        
+        class PrintThread(QThread):
+            finished = pyqtSignal(bool)
+            
+            def __init__(self, printer_manager, image):
+                super().__init__()
+                self.printer_manager = printer_manager
+                self.image = image
+            
+            def run(self):
+                success = self.printer_manager.print_image(
+                    self.image,
+                    size="4x6",
+                    copies=1
+                )
+                self.finished.emit(success)
+        
+        def on_print_finished(success):
+            from PyQt5.QtWidgets import QMessageBox
+            self.display_window.set_print_enabled(True)
+            
+            if success:
+                QMessageBox.information(
+                    self.display_window,
+                    "Print Success",
+                    "Photo sent to printer successfully! ✅"
+                )
+            else:
+                QMessageBox.warning(
+                    self.display_window,
+                    "Print Error",
+                    "Failed to print photo. Please check printer connection."
+                )
+        
+        self.print_thread = PrintThread(self.printer_manager, image)
+        self.print_thread.finished.connect(on_print_finished)
+        self.print_thread.start()
+        
+        print("[PhotoBooth] Print job initiated")
     
     def create_new_session(self, base_dir="resource/output"):
         # Example: session_20251109_211522
