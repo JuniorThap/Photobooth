@@ -17,6 +17,9 @@ Install pytorch cuda seperately
 pip3 install torch torchvision --index-url https://download.pytorch.org/whl/cu126
 ```
 
+download printer driver
+https://th.canon/th/support/0100913012
+
 ## How to use
 ``` bash
 python server.py
