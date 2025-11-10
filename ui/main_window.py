@@ -300,21 +300,6 @@ class DisplayWindow(QWidget):
         
         layout.addWidget(video_container, stretch=1)
         
-        # Large capture button at bottom
-        # self.capture_btn = QPushButton("📸 CAPTURE PHOTO")
-        # self.capture_btn.setMinimumHeight(100)
-        # self.capture_btn.setStyleSheet(f"""
-        #     font-size: 32px; 
-        #     font-weight: bold;
-        #     background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        #         stop:0 {FIBO_GOLD}, stop:1 {FIBO_ACCENT});
-        #     color: {FIBO_DARK_NAVY};
-        #     border: 5px solid {FIBO_GOLD};
-        #     border-radius: 25px;
-        #     padding: 20px;
-        # """)
-        # layout.addWidget(self.capture_btn)
-        
         self.setLayout(layout)
 
         # Button container for Capture and Print buttons
