@@ -757,8 +757,10 @@ class ControlWindow(QWidget):
 class PhotoBoothApp(QWidget):
     """Main application that manages both windows"""
     
-    def __init__(self, camera_index: int = CAMERA_INDEX):
+    def __init__(self, camera_index: int = CAMERA_INDEX, server_url = "https://52980aaf14dc.ngrok-free.app"):
         super().__init__()
+
+        self.server_url = server_url
         
         # Core managers
         self.segment = create_segment()
@@ -1026,7 +1028,7 @@ class PhotoBoothApp(QWidget):
             import qrcode
 
             if self.latest_photo_path:
-                base_url = "https://60132d191384.ngrok-free.app"
+                base_url = self.server_url
 
 
                 # Combine them into one QR code text
