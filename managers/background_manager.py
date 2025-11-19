@@ -11,8 +11,8 @@ class BackgroundManager:
         self.root_path = root_path
         self.current_background: Optional[np.ndarray] = None
 
-    def load_thumbnails(self, limit: int = 20) -> List[Tuple[str, QPixmap]]:
-        thumbnails = []
+    def load_thumbnails(self, limit: int = 20):
+        thumbnails = {"Images": [], "Videos": []}
         if not self.root_path.exists():
             return thumbnails
 
@@ -24,8 +24,8 @@ class BackgroundManager:
                     continue
                 resized = cv2.resize(img, THUMBNAIL_SIZE)
                 pixmap = self._numpy_to_pixmap(resized)
-                thumbnails.append((str(file), pixmap))
-                if len(thumbnails) >= limit:
+                thumbnails['Images'].append((str(file), pixmap))
+                if len(thumbnails['Images']) + len(thumbnails['Videos']) >= limit:
                     return thumbnails
             
             if file.is_file() and file.suffix.lower() in {'.mp4', '.mov'}:
@@ -35,9 +35,9 @@ class BackgroundManager:
                 _, frame = cap.read()
                 resized = cv2.resize(frame, THUMBNAIL_SIZE)
                 pixmap = self._numpy_to_pixmap(resized)
-                thumbnails.append((str(file), pixmap))
+                thumbnails['Videos'].append((str(file), pixmap))
                 cap.release()
-                if len(thumbnails) >= limit:
+                if len(thumbnails['Images']) + len(thumbnails["Videos"]) >= limit:
                     return thumbnails
 
         return thumbnails

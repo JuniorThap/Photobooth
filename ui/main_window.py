@@ -11,7 +11,7 @@ from PyQt5.QtCore import Qt, QThread, pyqtSignal, pyqtSlot, QSize, QTimer
 from PyQt5.QtGui import QPixmap, QImage, QIcon, QFont
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QLabel, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QPushButton, QFrame, QColorDialog, QScrollArea, QSizePolicy
+    QPushButton, QFrame, QColorDialog, QScrollArea, QSizePolicy, QTabWidget
 )
 
 from managers.background_manager import BackgroundManager
@@ -582,37 +582,71 @@ class ControlWindow(QWidget):
     def _create_background_section(self):
         section = QVBoxLayout()
         section.setSpacing(15)
-        
+
+        # Title
         title = QLabel("🖼️ BACKGROUNDS")
         title.setProperty("section", True)
         title.setAlignment(Qt.AlignCenter)
         section.addWidget(title)
-        
+
         # Video background note
         note = QLabel("💡 Video backgrounds supported")
         note.setStyleSheet(f"color: {FIBO_LIGHT_GOLD}; font-size: 14px; padding: 8px;")
         note.setAlignment(Qt.AlignCenter)
         section.addWidget(note)
-        
-        # Background grid (no scroll area)
-        grid = QGridLayout()
-        grid.setSpacing(20)
-        grid.setContentsMargins(20, 20, 20, 20)
-        
-        thumbnails = self.bg_manager.load_thumbnails(limit=60)
-        cols = 2
-        for i, (path, pixmap) in enumerate(thumbnails):
+
+        # ----------------------------------------
+        #          TAB WIDGET (Images / Videos)
+        # ----------------------------------------
+        tabs = QTabWidget()
+        tabs.setStyleSheet("""
+            QTabWidget::pane { border: 0px; }
+            QTabBar::tab {
+                padding: 10px 20px;
+                font-size: 16px;
+            }
+        """)
+
+        # Load thumbnails grouped
+        thumbs = self.bg_manager.load_thumbnails(limit=80)
+        image_thumbs = thumbs["Images"]
+        video_thumbs = thumbs["Videos"]
+
+        # Create the two pages
+        image_page = self._create_thumbnail_grid_page(image_thumbs)
+        video_page = self._create_thumbnail_grid_page(video_thumbs)
+
+        # Add tabs
+        tabs.addTab(image_page, "Images")
+        tabs.addTab(video_page, "Videos")
+
+        section.addWidget(tabs)
+
+        return section
+
+    def _create_thumbnail_grid_page(self, items):
+        """items = [(path, pixmap), ...]"""
+
+        wrapper = QWidget()
+        layout = QGridLayout(wrapper)
+        layout.setSpacing(10)
+        layout.setContentsMargins(10, 10, 10, 10)
+
+        cols = 5
+
+        for i, (path, pixmap) in enumerate(items):
             btn = QPushButton()
             btn.setIcon(QIcon(pixmap))
-            btn.setIconSize(QSize(200, 133))
+            btn.setIconSize(QSize(220, 150))
             btn.setFixedSize(220, 150)
             btn.setToolTip(Path(path).name)
+
             btn.clicked.connect(lambda checked=False, p=path: self._on_bg_select(p))
-            grid.addWidget(btn, i // cols, i % cols)
-        
-        section.addLayout(grid)
-        
-        return section
+
+            layout.addWidget(btn, i // cols, i % cols)
+
+        return wrapper
+
     
     def _create_outline_section(self):
         section = QVBoxLayout()
