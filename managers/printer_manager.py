@@ -7,19 +7,23 @@ class PrinterManager:
         self.printer_name = win32print.GetDefaultPrinter()
 
     # ----------------------------------------------------------
-    #   Build an A4 canvas (portrait) and paste image at top-left
+    #   Build A6 PORTRAIT canvas and center image
     # ----------------------------------------------------------
-    def make_a4_canvas(self, image):
-        # Create A4 canvas at 300 DPI
-        a4_w = int(8.27 * 300)   # width in px
-        a4_h = int(11.69 * 300)  # height in px
+    def make_a6_portrait_canvas(self, image, pw, ph):
+        # Get image dimensions
+        img_w, img_h = image.size
+        
+        # Calculate scaling to fit image within canvas while maintaining aspect ratio
+        scale_w = pw / img_w
+        scale_h = ph / img_h
+        
+        # Use the smaller scale to ensure image fits completely (no crop)
+        scale = min(scale_w, scale_h) * 0.85
+        
+        new_w = int(img_w * scale)
+        new_h = int(img_h * scale)
 
-        canvas = Image.new("RGB", (a4_w, a4_h), "white")
-
-        # Paste at top-left corner
-        canvas.paste(image, (0, 0))
-
-        return canvas
+        return image.resize((new_w, new_h), Image.LANCZOS)
 
     # ----------------------------------------------------------
     #   Simple preview window BEFORE printing
@@ -28,36 +32,44 @@ class PrinterManager:
         image.show()
 
     # ----------------------------------------------------------
-    #   Print the A4 canvas
+    #   Print on A6 portrait paper
     # ----------------------------------------------------------
     def print_image(self, file_path):
-
-        # Load image
-        original = Image.open(file_path).convert("RGB")
-
-        # Build A4 canvas
-        a4 = self.make_a4_canvas(original)
-
-        # self.preview_image(a4)
+        # Load image WITHOUT rotation
+        original = Image.open(file_path).convert("RGB").rotate(90, expand=True)
 
         # ---- PRINTING ----
         hprinter = win32print.OpenPrinter(self.printer_name)
         hDC = win32ui.CreateDC()
         hDC.CreatePrinterDC(self.printer_name)
 
-        pw = hDC.GetDeviceCaps(8)   # HORZRES
-        ph = hDC.GetDeviceCaps(10)  # VERTRES
+        # Get printer's printable area
+        pw = hDC.GetDeviceCaps(8)   # HORZRES - printable width
+        ph = hDC.GetDeviceCaps(10)  # VERTRES - printable height
+        print("Printable:", pw, ph)
 
-        # Resize A4 canvas to printer's area
-        print_img = a4.resize((pw, ph))
-        dib = ImageWin.Dib(print_img)
+        # Get printer DPI
+        printer_dpi_x = hDC.GetDeviceCaps(88)  # LOGPIXELSX
+        printer_dpi_y = hDC.GetDeviceCaps(90)  # LOGPIXELSY
+        print("Printer dpi:", printer_dpi_x, printer_dpi_y)
 
-        hDC.StartDoc("A4_Print")
+        # Build A6 PORTRAIT canvas with centered image
+        a6_canvas = self.make_a6_portrait_canvas(original, pw, ph)
+        print("A6 Canvas size:", a6_canvas.size)
+
+        # Preview before printing
+        self.preview_image(a6_canvas)
+
+        # Resize canvas to actual print size
+        dib = ImageWin.Dib(a6_canvas)
+
+        hDC.StartDoc("A6_Portrait_Print")
         hDC.StartPage()
 
-        # Print entire A4 on paper
-        scale = 3
-        dib.draw(hDC.GetHandleOutput(), (0, 0, pw*scale, ph*scale))
+        # Print centered on page
+        x_offset = (pw - a6_canvas.size[0]) // 2
+        print((pw - a6_canvas.size[0]) // 2, 0, x_offset + a6_canvas.size[0], a6_canvas.size[1])
+        dib.draw(hDC.GetHandleOutput(), (x_offset, 0, x_offset + a6_canvas.size[0], a6_canvas.size[1]))
 
         hDC.EndPage()
         hDC.EndDoc()
