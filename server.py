@@ -137,5 +137,72 @@ def serve_folder(folder):
     """
     return render_template_string(html, folder=folder, files=files)
 
+@app.route("/camera")
+def camera_page():
+    html = """
+    <html>
+    <head>
+        <title>Camera Preview</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+        <style>
+            body {
+                background:#111;
+                margin:0;
+                padding:0;
+                display:flex;
+                flex-direction:column;
+                justify-content:center;
+                align-items:center;
+                height:100vh;
+                color:white;
+                font-family:sans-serif;
+            }
+
+            video {
+                width:100%;
+                max-width:480px;
+                height:auto;
+                background:black;
+                border-radius:10px;
+                object-fit:cover;
+            }
+
+            button {
+                margin-top:20px;
+                font-size:20px;
+                padding:12px 20px;
+                border:none;
+                border-radius:10px;
+                background:#007bff;
+                color:white;
+            }
+        </style>
+
+        <script>
+            async function startCamera() {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "user" }
+                    });
+                    const video = document.getElementById("video");
+                    video.srcObject = stream;
+                } catch (err) {
+                    alert("Camera access error: " + err);
+                }
+            }
+        </script>
+    </head>
+
+    <body onload="startCamera()">
+        <video id="video" autoplay playsinline></video>
+        <button onclick="startCamera()">Restart Camera</button>
+    </body>
+    </html>
+    """
+
+    return render_template_string(html)
+
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)

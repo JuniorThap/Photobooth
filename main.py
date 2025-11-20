@@ -9,7 +9,7 @@ def main():
     font = QFont("Segoe UI", 10)
     app.setFont(font)
     
-    photobooth = PhotoBoothApp(camera_index=0, server_url="https://cc68e2bd92e7.ngrok-free.app")
+    photobooth = PhotoBoothApp(camera_index=0, server_url="https://82df8cf1ab68.ngrok-free.app")
     photobooth.show()
     
     # Cleanup on exit

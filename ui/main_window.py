@@ -282,19 +282,19 @@ class DisplayWindow(QWidget):
         self.qr_label.setFixedSize(400, 400)
         qr_container_layout.addWidget(self.qr_label, alignment=Qt.AlignCenter)
         
-        self.qr_text_label = QLabel("Scan to Download Your Photos!")
-        self.qr_text_label.setProperty("subtitle", True)
-        self.qr_text_label.setAlignment(Qt.AlignCenter)
-        self.qr_text_label.setStyleSheet(f"""
-            font-size: 28px; 
-            font-weight: bold;
-            color: {FIBO_GOLD}; 
-            background: rgba(26, 31, 58, 200);
-            padding: 15px 30px;
-            border: 3px solid {FIBO_GOLD};
-            border-radius: 15px;
-        """)
-        qr_container_layout.addWidget(self.qr_text_label, alignment=Qt.AlignCenter)
+        # self.qr_text_label = QLabel("Scan to Download Your Photos!")
+        # self.qr_text_label.setProperty("subtitle", True)
+        # self.qr_text_label.setAlignment(Qt.AlignCenter)
+        # self.qr_text_label.setStyleSheet(f"""
+        #     font-size: 28px; 
+        #     font-weight: bold;
+        #     color: {FIBO_GOLD}; 
+        #     background: rgba(26, 31, 58, 200);
+        #     padding: 15px 30px;
+        #     border: 3px solid {FIBO_GOLD};
+        #     border-radius: 15px;
+        # """)
+        # qr_container_layout.addWidget(self.qr_text_label, alignment=Qt.AlignCenter)
         
         self.qr_container.hide()
         self.qr_container.raise_()  # Ensure it's on top
@@ -474,7 +474,7 @@ class DisplayWindow(QWidget):
         self._position_overlays()  # Ensure proper position
         
         # Auto-hide after 10 seconds
-        QTimer.singleShot(10000, self.hide_qr_code)
+        QTimer.singleShot(20000, self.hide_qr_code)
     
     def hide_qr_code(self):
         """Hide QR code display"""
@@ -632,7 +632,7 @@ class ControlWindow(QWidget):
         layout.setSpacing(10)
         layout.setContentsMargins(10, 10, 10, 10)
 
-        cols = 5
+        cols = 3
 
         for i, (path, pixmap) in enumerate(items):
             btn = QPushButton()

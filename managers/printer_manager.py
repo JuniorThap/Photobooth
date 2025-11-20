@@ -1,124 +1,73 @@
 import win32print
 import win32ui
-import win32con
 from PIL import Image, ImageWin
-
 
 class PrinterManager:
     def __init__(self):
         self.printer_name = win32print.GetDefaultPrinter()
 
-    # -----------------------------------------------------------
-    #   Function #2: Prepare Landscape Photo on Landscape A4
-    # -----------------------------------------------------------
-    def prepare_4x6_on_a4(self, file_path, xdpi, ydpi):
-        """
-        - Input: landscape photo path
-        - Output: a landscape A4 image containing the 4x6 photo
-        """
+    # ----------------------------------------------------------
+    #   Build an A4 canvas (portrait) and paste image at top-left
+    # ----------------------------------------------------------
+    def make_a4_canvas(self, image):
+        # Create A4 canvas at 300 DPI
+        a4_w = int(8.27 * 300)   # width in px
+        a4_h = int(11.69 * 300)  # height in px
 
-        # ---- Load the photo ----
-        img = Image.open(file_path).convert("RGB")
+        canvas = Image.new("RGB", (a4_w, a4_h), "white")
 
-        # Force landscape orientation
-        if img.height < img.width:
-            img = img.rotate(90, expand=True)
+        # Paste at top-left corner
+        canvas.paste(image, (0, 0))
 
-        # ---- 4x6 landscape at 300 DPI is 1800×1200 px ----
-        photo_w, photo_h = 6 * xdpi, 4 * ydpi
+        return canvas
 
-        # Resize image to fit 4×6 landscape
-        img_aspect = img.width / img.height
-        target_aspect = photo_w / photo_h
+    # ----------------------------------------------------------
+    #   Simple preview window BEFORE printing
+    # ----------------------------------------------------------
+    def preview_image(self, image):
+        image.show()
 
-        if img_aspect > target_aspect:
-            new_w = photo_w
-            new_h = int(photo_w / img_aspect)
-        else:
-            new_h = photo_h
-            new_w = int(photo_h * img_aspect)
-
-        img = img.resize((new_w, new_h), Image.LANCZOS)
-
-        # ---- Create Landscape A4 Canvas (3508×2480 @ 300 dpi) ----
-        width_px  = int(8.27 * xdpi)
-        height_px = int(11.69 * ydpi)
-        a4_canvas = Image.new("RGB", (width_px, height_px), "white")
-
-        # Margin in inches (you can change this)
-        margin_in = 0.25  # 0.25 inch margin from corner
-
-        # Convert to pixels
-        margin_x = int(margin_in * xdpi)
-        margin_y = int(margin_in * ydpi)
-
-        # Place at TOP LEFT with margin
-        x = margin_x
-        y = margin_y
-
-        a4_canvas.paste(img, (x, y))
-
-
-        return a4_canvas  # <-- Return final image for printing
-
-
-    # -----------------------------------------------------------
-    #   Function #1: Print image (already prepared)
-    # -----------------------------------------------------------
+    # ----------------------------------------------------------
+    #   Print the A4 canvas
+    # ----------------------------------------------------------
     def print_image(self, file_path):
-        # Printer DC
+
+        # Load image
+        original = Image.open(file_path).convert("RGB")
+
+        # Build A4 canvas
+        a4 = self.make_a4_canvas(original)
+
+        # self.preview_image(a4)
+
+        # ---- PRINTING ----
+        hprinter = win32print.OpenPrinter(self.printer_name)
         hDC = win32ui.CreateDC()
         hDC.CreatePrinterDC(self.printer_name)
 
-        pw = hDC.GetDeviceCaps(win32con.HORZRES)
-        ph = hDC.GetDeviceCaps(win32con.VERTRES)
+        pw = hDC.GetDeviceCaps(8)   # HORZRES
+        ph = hDC.GetDeviceCaps(10)  # VERTRES
 
-        xdpi = hDC.GetDeviceCaps(win32con.LOGPIXELSX)
-        ydpi = hDC.GetDeviceCaps(win32con.LOGPIXELSY)
-        image = self.prepare_4x6_on_a4(file_path, xdpi, ydpi)
+        # Resize A4 canvas to printer's area
+        print_img = a4.resize((pw, ph))
+        dib = ImageWin.Dib(print_img)
 
-        # Convert to DIB
-        dib = ImageWin.Dib(image)
-
-        print(f"Printable area: {pw} x {ph}")
-
-        # Original prepared A4 image size
-        cw, ch = image.size  # 3508 × 2480
-
-        # ---------------------------------------------------------
-        # SCALE TO FIT (corner placement)
-        # ---------------------------------------------------------
-        # Landscape A4 is wider than tall, so match width
-        # scale = pw / cw
-        # new_w = pw
-        # new_h = int(ch * scale)
-
-        # If height overflows, adjust by height instead
-        # if new_h > ph:
-        #     scale = ph / ch
-        #     new_h = ph
-        #     new_w = int(cw * scale)
-
-        # Print at corner (0,0)
-        x = 0
-        y = 0
-
-        hDC.StartDoc("A4_4x6_Print")
+        hDC.StartDoc("A4_Print")
         hDC.StartPage()
 
-        # DRAW SCALED TO CORNER
-        dib.draw(hDC.GetHandleOutput(), (x, y, x + cw, y + ch))
+        # Print entire A4 on paper
+        scale = 3
+        dib.draw(hDC.GetHandleOutput(), (0, 0, pw*scale, ph*scale))
 
         hDC.EndPage()
         hDC.EndDoc()
+
         hDC.DeleteDC()
-
-    def preview_image(self, image):
-        image.show()  # simple preview using default image viewer
+        win32print.ClosePrinter(hprinter)
 
 
-
-
-if __name__ == "__main__": 
-    pm = PrinterManager() 
-    pm.print_image(r"C:\Users\thapa\Documents\AIWorks\Photobooth\resource\output\session_20251110_104319\FIBO_Grad.png")
+if __name__ == "__main__":
+    pm = PrinterManager()
+    pm.print_image(
+        r"C:\Users\thapa\Documents\AIWorks\Photobooth\resource\output\session_20251110_104319\FIBO_Grad.png"
+    )
