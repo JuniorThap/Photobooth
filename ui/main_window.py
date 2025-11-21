@@ -269,6 +269,7 @@ class DisplayWindow(QWidget):
         qr_container_layout = QVBoxLayout(self.qr_container)
         qr_container_layout.setContentsMargins(0, 0, 0, 0)
         qr_container_layout.setSpacing(20)
+        self.qr_container.setFixedSize(400, 400)
         
         # QR Code display
         self.qr_label = QLabel()
