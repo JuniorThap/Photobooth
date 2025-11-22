@@ -795,7 +795,7 @@ class PhotoBoothApp(QWidget):
     def __init__(self, camera_index: int = CAMERA_INDEX, server_url = "https://52980aaf14dc.ngrok-free.app"):
         super().__init__()
 
-        self.server_url = server_url
+        self.server_url = server_url.strip()
         
         # Core managers
         self.segment = create_segment()
