@@ -18,7 +18,7 @@ class PrinterManager:
         scale_h = ph / img_h
         
         # Use the smaller scale to ensure image fits completely (no crop)
-        scale = min(scale_w, scale_h) * 0.85
+        scale = min(scale_w, scale_h) * 0.9 # wawa = 0.85
         
         new_w = int(img_w * scale)
         new_h = int(img_h * scale)
